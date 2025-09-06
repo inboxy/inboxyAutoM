@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Recording PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1 class="app-title">Motion Recorder</h1>
+            <p class="app-subtitle">High-frequency sensor data recording</p>
+        </header>
+        
+        <div class="card">
+            <h2 class="card-title">Sensor Permissions</h2>
+            <div class="permissions-grid">
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    <span>GPS</span>
+                    <span id="gps-status" class="permission-status status-pending">Pending</span>
+                </div>
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    <span>Accelerometer</span>
+                    <span id="accel-status" class="permission-status status-pending">Pending</span>
+                </div>
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    <span>Gyroscope</span>
+                    <span id="gyro-status" class="permission-status status-pending">Pending</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <div id="status-indicator" class="status-indicator status-idle">
+                    <span>Ready to record</span>
+                </div>
+                
+                <div class="recording-controls">
+                    <button id="start-btn" class="button button-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        START RECORDING
+                    </button>
+                    <button id="stop-btn" class="button button-error" style="display: none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                        STOP RECORDING
+                    </button>
+                </div>
+                
+                <div id="post-recording-controls" class="post-recording-controls">
+                    <button id="download-btn" class="button button-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        DOWNLOAD CSV
+                    </button>
+                    <button id="upload-btn" class="button button-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                        </svg>
+                        UPLOAD JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title">Live Sensor Data</h2>
+            <div class="data-display">
+                <div class="data-group">
+                    <div class="data-group-title">GPS</div>
+                    <div class="data-item">
+                        <span class="data-label">Latitude:</span>
+                        <span id="gps-lat" class="data-value">--</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Longitude:</span>
+                        <span id="gps-lon" class="data-value">--</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Error:</span>
+                        <span id="gps-error" class="data-value">-- m</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Altitude:</span>
+                        <span id="gps-alt" class="data-value">-- m</span>
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <div class="data-group-title">Accelerometer</div>
+                    <div class="data-item">
+                        <span class="data-label">X:</span>
+                        <span id="accel-x" class="data-value">-- m/s²</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Y:</span>
+                        <span id="accel-y" class="data-value">-- m/s²</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Z:</span>
+                        <span id="accel-z" class="data-value">-- m/s²</span>
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <div class="data-group-title">Gyroscope</div>
+                    <div class="data-item">
+                        <span class="data-label">Alpha:</span>
+                        <span id="gyro-alpha" class="data-value">-- °/s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Beta:</span>
+                        <span id="gyro-beta" class="data-value">-- °/s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Gamma:</span>
+                        <span id="gyro-gamma" class="data-value">-- °/s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-id-display">
+            User ID: <span id="user-id">Loading...</span>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
