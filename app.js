@@ -394,38 +394,183 @@ class MotionRecorderApp {
             options
         );
     }
+
+
+    //nwq
+
+// Replace the startMotionTracking method in app.js with this enhanced version
+
+startMotionTracking() {
+    // High-performance motion tracking for 140Hz
+    let lastAccelUpdate = 0;
+    let lastGyroUpdate = 0;
+    const targetInterval = 1000 / 140; // ~7.14ms for 140Hz
     
-    startMotionTracking() {
-        // High-performance motion tracking for up to 140Hz
-        let lastAccelUpdate = 0;
-        let lastGyroUpdate = 0;
-        const targetInterval = 1000 / this.adaptiveSampleRate;
-        
-        // Use a more efficient data batching approach
-        let accelBatch = [];
-        let gyroBatch = [];
-        const BATCH_SIZE = 10;
-        const BATCH_INTERVAL = 100;
-        
-        // Batch sender
-        const sendBatch = () => {
-            if (this.isRecording) {
-                if (accelBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: accelBatch
-                    });
-                    accelBatch = [];
+    // Use a more efficient data batching approach
+    let accelBatch = [];
+    let gyroBatch = [];
+    const BATCH_SIZE = 10; // Send data in batches to reduce overhead
+    const BATCH_INTERVAL = 100; // Send batches every 100ms
+    
+    // Batch sender
+    const sendBatch = () => {
+        if (this.isRecording) {
+            if (accelBatch.length > 0) {
+                this.worker.postMessage({
+                    type: 'ADD_DATA_BATCH',
+                    data: accelBatch
+                });
+                accelBatch = [];
+            }
+            if (gyroBatch.length > 0) {
+                this.worker.postMessage({
+                    type: 'ADD_DATA_BATCH',
+                    data: gyroBatch
+                });
+                gyroBatch = [];
+            }
+        }
+    };
+    
+    // Set up batch interval
+    setInterval(sendBatch, BATCH_INTERVAL);
+    
+    // Request high frequency updates (iOS 13+ requirement)
+    if (typeof DeviceMotionEvent !== 'undefined' && 
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission()
+            .then(response => {
+                if (response === 'granted') {
+                    // iOS specific: request high frequency
+                    if (window.DeviceMotionEvent && window.DeviceMotionEvent.interval !== undefined) {
+                        // Request maximum frequency (usually capped at 60-100Hz on iOS)
+                        window.DeviceMotionEvent.interval = 1000 / 140; // Request 140Hz
+                    }
                 }
-                if (gyroBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: gyroBatch
+            });
+    }
+    
+    // Remove throttling and use requestAnimationFrame for better performance
+    let rafId;
+    let lastFrameTime = 0;
+    const sensorData = {
+        acceleration: null,
+        rotationRate: null,
+        timestamp: 0
+    };
+    
+    // High-frequency motion event handler
+    window.addEventListener('devicemotion', (event) => {
+        // Store latest sensor data without throttling
+        sensorData.acceleration = event.accelerationIncludingGravity;
+        sensorData.rotationRate = event.rotationRate;
+        sensorData.timestamp = Date.now();
+    }, { passive: true }); // Mark as passive for better performance
+    
+    // High-frequency sampling loop using RAF
+    const sampleSensors = (currentTime) => {
+        const deltaTime = currentTime - lastFrameTime;
+        
+        // Sample at target rate
+        if (deltaTime >= targetInterval) {
+            const now = Date.now();
+            const timestamp = new Date().toISOString();
+            
+            // Process acceleration data
+            if (sensorData.acceleration) {
+                const { x, y, z } = sensorData.acceleration;
+                
+                // Update UI (throttle UI updates to 10Hz for performance)
+                if (now - lastAccelUpdate > 100) {
+                    document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
+                    document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
+                    document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+                    lastAccelUpdate = now;
+                }
+                
+                // Add to batch if recording
+                if (this.isRecording) {
+                    accelBatch.push({
+                        recordingTimestamp: this.startTime,
+                        userId: this.userId,
+                        accelTimestamp: timestamp,
+                        accelX: x,
+                        accelY: y,
+                        accelZ: z,
+                        timestamp: now
                     });
-                    gyroBatch = [];
+                    
+                    // Send immediately if batch is full
+                    if (accelBatch.length >= BATCH_SIZE) {
+                        this.worker.postMessage({
+                            type: 'ADD_DATA_BATCH',
+                            data: [...accelBatch]
+                        });
+                        accelBatch = [];
+                    }
                 }
             }
-        };
+            
+            // Process gyroscope data
+            if (sensorData.rotationRate) {
+                const { alpha, beta, gamma } = sensorData.rotationRate;
+                
+                // Update UI (throttled)
+                if (now - lastGyroUpdate > 100) {
+                    document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
+                    document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
+                    document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+                    lastGyroUpdate = now;
+                }
+                
+                // Add to batch if recording
+                if (this.isRecording) {
+                    gyroBatch.push({
+                        recordingTimestamp: this.startTime,
+                        userId: this.userId,
+                        gyroTimestamp: timestamp,
+                        gyroAlpha: alpha,
+                        gyroBeta: beta,
+                        gyroGamma: gamma,
+                        timestamp: now
+                    });
+                    
+                    // Send immediately if batch is full
+                    if (gyroBatch.length >= BATCH_SIZE) {
+                        this.worker.postMessage({
+                            type: 'ADD_DATA_BATCH',
+                            data: [...gyroBatch]
+                        });
+                        gyroBatch = [];
+                    }
+                }
+            }
+            
+            lastFrameTime = currentTime;
+        }
+        
+        rafId = requestAnimationFrame(sampleSensors);
+    };
+    
+    // Start the sampling loop
+    rafId = requestAnimationFrame(sampleSensors);
+    
+    // Store RAF ID for cleanup
+    this.sensorRafId = rafId;
+}
+
+// Add cleanup method to stop RAF when not needed
+stopMotionTracking() {
+    if (this.sensorRafId) {
+        cancelAnimationFrame(this.sensorRafId);
+        this.sensorRafId = null;
+    }
+}
+
+
+//
+    
+
         
         // Set up batch interval
         this.batchInterval = setInterval(sendBatch, BATCH_INTERVAL);
