@@ -54,28 +54,39 @@ function generateCSV(data) {
     
     let csvContent = headers.join(',') + '\n';
     
+    console.log('Worker: Generating CSV for', data.length, 'data points');
+    console.log('Worker: Sample data point:', data[0]);
+    
     for (const point of data) {
         const row = [
-            point.recordingTimestamp || '',
-            point.userId || '',
-            point.gpsTimestamp || '',
-            point.gpsLat || '',
-            point.gpsLon || '',
-            point.gpsError || '',
-            point.gpsAlt || '',
-            point.accelTimestamp || '',
-            point.accelX || '',
-            point.accelY || '',
-            point.accelZ || '',
-            point.gyroTimestamp || '',
-            point.gyroAlpha || '',
-            point.gyroBeta || '',
-            point.gyroGamma || ''
+            escapeCSVField(point.recordingTimestamp || ''),
+            escapeCSVField(point.userId || ''),
+            escapeCSVField(point.gpsTimestamp || ''),
+            point.gpsLat !== undefined && point.gpsLat !== '' ? point.gpsLat : '',
+            point.gpsLon !== undefined && point.gpsLon !== '' ? point.gpsLon : '',
+            point.gpsError !== undefined && point.gpsError !== '' ? point.gpsError : '',
+            point.gpsAlt !== undefined && point.gpsAlt !== '' ? point.gpsAlt : '',
+            escapeCSVField(point.accelTimestamp || ''),
+            point.accelX !== undefined && point.accelX !== '' ? point.accelX : '',
+            point.accelY !== undefined && point.accelY !== '' ? point.accelY : '',
+            point.accelZ !== undefined && point.accelZ !== '' ? point.accelZ : '',
+            escapeCSVField(point.gyroTimestamp || ''),
+            point.gyroAlpha !== undefined && point.gyroAlpha !== '' ? point.gyroAlpha : '',
+            point.gyroBeta !== undefined && point.gyroBeta !== '' ? point.gyroBeta : '',
+            point.gyroGamma !== undefined && point.gyroGamma !== '' ? point.gyroGamma : ''
         ];
         csvContent += row.join(',') + '\n';
     }
     
+    console.log('Worker: CSV generated with', data.length, 'rows');
     return csvContent;
+}
+
+function escapeCSVField(field) {
+    if (typeof field === 'string' && (field.includes(',') || field.includes('"') || field.includes('\n'))) {
+        return '"' + field.replace(/"/g, '""') + '"';
+    }
+    return field;
 }
 
 // Handle worker errors
