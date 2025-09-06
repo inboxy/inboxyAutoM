@@ -1,0 +1,54 @@
+{
+    "name": "Motion Recording PWA",
+    "short_name": "MotionRecorder",
+    "description": "High-frequency sensor data recording application",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#FFFBFE",
+    "theme_color": "#6750A4",
+    "orientation": "portrait-primary",
+    "scope": "./",
+    "lang": "en",
+    "icons": [
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiBmaWxsPSIjNjc1MEE0Ii8+CjxwYXRoIGQ9Ik05NiA0OEM4MC41MzYgNDggNjggNjAuNTM2IDY4IDc2Vjk2QzY4IDExMS40NjQgODAuNTM2IDEyNCA5NiAxMjRIMTE2QzEzMS40NjQgMTI0IDE0NCAxMTEuNDY0IDE0NCA5NlY3NkMxNDQgNjAuNTM2IDEzMS40NjQgNDggMTE2IDQ4SDk2WiIgZmlsbD0iI0ZGRkJGRSIvPgo8Y2lyY2xlIGN4PSI5NiIgY3k9Ijc2IiByPSI4IiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjExNiIgY3k9Ijc2IiByPSI4IiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjEwNiIgY3k9Ijk2IiByPSI4IiBmaWxsPSIjNjc1MEE0Ii8+CjxwYXRoIGQ9Ik05NiAxNDhIMTE2VjEzNkg5NlYxNDhaIiBmaWxsPSIjNjc1MEE0Ii8+Cjx0ZXh0IHg9Ijk2IiB5PSIxNjgiIGZvbnQtZmFtaWx5PSJSb2JvdG8iIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1MDAiIGZpbGw9IiM2NzUwQTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1vdGlvbjwvdGV4dD4KPC9zdmc+Cg==",
+            "type": "image/svg+xml",
+            "sizes": "192x192",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjNjc1MEE0Ii8+CjxwYXRoIGQ9Ik0yNTYgMTI4QzIxNS4xNzMgMTI4IDE4MiAxNjEuMTczIDE4MiAyMDJWMjU2QzE4MiAyOTYuODI3IDIxNS4xNzMgMzMwIDI1NiAzMzBIMzEwQzM1MC44MjcgMzMwIDM4NCAyOTYuODI3IDM4NCAyNTZWMjAyQzM4NCAxNjEuMTczIDM1MC44MjcgMTI4IDMxMCAxMjhIMjU2WiIgZmlsbD0iI0ZGRkJGRSIvPgo8Y2lyY2xlIGN4PSIyNTYiIGN5PSIyMDIiIHI9IjIwIiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjMxMCIgY3k9IjIwMiIgcj0iMjAiIGZpbGw9IiM2NzUwQTQiLz4KPGNpcmNsZSBjeD0iMjgzIiBjeT0iMjU2IiByPSIyMCIgZmlsbD0iIzY3NTBBNCIvPgo8cGF0aCBkPSJNMjU2IDM5NEgzMTBWMzYySDI1NlYzOTRaIiBmaWxsPSIjNjc1MEE0Ii8+Cjx0ZXh0IHg9IjI4MyIgeT0iNDQwIiBmb250LWZhbWlseT0iUm9ib3RvIiBmb250LXNpemU9IjMyIiBmb250LXdlaWdodD0iNTAwIiBmaWxsPSIjNjc1MEE0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Nb3Rpb248L3RleHQ+Cjwvc3ZnPgo=",
+            "type": "image/svg+xml",
+            "sizes": "512x512",
+            "purpose": "any"
+        }
+    ],
+    "categories": ["productivity", "utilities"],
+    "screenshots": [
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjU2OCIgdmlld0JveD0iMCAwIDMyMCA1NjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iNTY4IiBmaWxsPSIjRkZGQkZFIi8+CjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjI4OCIgaGVpZ2h0PSI1MzYiIHJ4PSIxMiIgZmlsbD0iI0YzRURGNyIvPgo8dGV4dCB4PSIxNjAiIHk9Ijc2IiBmb250LWZhbWlseT0iUm9ib3RvIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iNTAwIiBmaWxsPSIjNjc1MEE0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Nb3Rpb24gUmVjb3JkZXI8L3RleHQ+CjwvZGdzPgo=",
+            "sizes": "320x568",
+            "type": "image/svg+xml",
+            "form_factor": "narrow"
+        }
+    ],
+    "features": [
+        "cross-platform",
+        "high-performance-sensors",
+        "offline-data-storage"
+    ],
+    "shortcuts": [
+        {
+            "name": "Start Recording",
+            "short_name": "Record",
+            "description": "Start a new motion recording session",
+            "url": "./?action=record",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNDgiIGN5PSI0OCIgcj0iNDgiIGZpbGw9IiNiYTFhMWEiLz4KPC9zdmc+Cg==",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ]
+}
