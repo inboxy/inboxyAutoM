@@ -301,4 +301,176 @@ class MotionRecorderApp {
         
         // Create recording entry in IndexedDB
         const transaction = this.db.transaction(['recordings'], 'readwrite');
+        const store = transaction.objectStore('recordings');
+        
+        const recording = {
+            userId: this.userId,
+            timestamp: this.startTime,
+            status: 'recording'
+        };
+        
+        const request = store.add(recording);
+        request.onsuccess = () => {
+            this.currentRecordingId = request.result;
+        };
+    }
+    
+    async stopRecording() {
+        this.isRecording = false;
+        
+        // Update UI
+        document.getElementById('start-btn').style.display = 'inline-flex';
+        document.getElementById('stop-btn').style.display = 'none';
+        document.getElementById('post-recording-controls').classList.add('visible');
+        
+        const statusIndicator = document.getElementById('status-indicator');
+        statusIndicator.className = 'status-indicator status-idle';
+        statusIndicator.innerHTML = '<span>Recording completed</span>';
+        
+        // Stop worker recording
+        this.worker.postMessage({ type: 'STOP_RECORDING' });
+    }
+    
+    async saveRecordingData(data) {
+        if (!this.currentRecordingId) return;
+        
+        // Update recording status
+        const transaction = this.db.transaction(['recordings'], 'readwrite');
+        const recordingStore = transaction.objectStore('recordings');
+        
+        const getRequest = recordingStore.get(this.currentRecordingId);
+        getRequest.onsuccess = () => {
+            const recording = getRequest.result;
+            recording.status = 'completed';
+            recording.endTime = new Date().toISOString();
+            recording.dataPointCount = data.length;
+            recordingStore.put(recording);
+        };
+        
+        // Save data points
+        const dataTransaction = this.db.transaction(['dataPoints'], 'readwrite');
+        const dataStore = dataTransaction.objectStore('dataPoints');
+        
+        for (const point of data) {
+            point.recordingId = this.currentRecordingId;
+            dataStore.add(point);
+        }
+        
+        console.log(`Saved ${data.length} data points to IndexedDB`);
+    }
+    
+    async downloadCSV() {
+        if (!this.currentRecordingId) return;
+        
+        // Retrieve data from IndexedDB
+        const transaction = this.db.transaction(['dataPoints'], 'readonly');
+        const store = transaction.objectStore('dataPoints');
+        const index = store.index('recordingId');
+        
+        const request = index.getAll(this.currentRecordingId);
+        request.onsuccess = () => {
+            const data = request.result;
+            this.worker.postMessage({
+                type: 'GENERATE_CSV',
+                data: data
+            });
+        };
+    }
+    
+    downloadCSVFile(csvContent) {
+        const now = new Date();
+        const year = now.getUTCFullYear();
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const date = String(now.getUTCDate()).padStart(2, '0');
+        const time = now.toISOString().substr(11, 8).replace(/:/g, '');
+        
+        const filename = `inbx_${this.userId}_${year}_${month}_${date}_${time}.csv`;
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+    
+    async uploadJSON() {
+        if (!this.currentRecordingId) return;
+        
+        // Retrieve recording and data from IndexedDB
+        const recordingTransaction = this.db.transaction(['recordings'], 'readonly');
+        const recordingStore = recordingTransaction.objectStore('recordings');
+        const recordingRequest = recordingStore.get(this.currentRecordingId);
+        
+        recordingRequest.onsuccess = () => {
+            const recording = recordingRequest.result;
+            
+            const dataTransaction = this.db.transaction(['dataPoints'], 'readonly');
+            const dataStore = dataTransaction.objectStore('dataPoints');
+            const index = dataStore.index('recordingId');
+            const dataRequest = index.getAll(this.currentRecordingId);
+            
+            dataRequest.onsuccess = () => {
+                const dataPoints = dataRequest.result;
+                
+                const jsonData = {
+                    recording: recording,
+                    dataPoints: dataPoints,
+                    exportTimestamp: new Date().toISOString(),
+                    totalPoints: dataPoints.length
+                };
+                
+                // Post to configured URL (example.com for development)
+                fetch('https://example.com/api/recordings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(jsonData)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Upload successful!');
+                    } else {
+                        alert('Upload failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                    alert('Upload failed. Please check your connection.');
+                });
+            };
+        };
+    }
+}
+
+// Initialize the app when DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        new MotionRecorderApp();
+    });
+} else {
+    new MotionRecorderApp();
+}
+
+// Register service worker for PWA functionality
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then((registration) => {
+                console.log('ServiceWorker registration successful:', registration.scope);
+            })
+            .catch((error) => {
+                console.error('ServiceWorker registration failed:', error);
+            });
+    });
+} else {
+    console.log('Service workers are not supported');
+}
         
