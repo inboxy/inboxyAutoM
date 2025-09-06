@@ -6,73 +6,97 @@
     <title>Motion Recording PWA</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#6750A4">
+    <meta name="description" content="High-frequency sensor data recording application">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjgiIGZpbGw9IiNGRkZCRkUiLz4KPC9zdmc+Cg==">
 </head>
 <body>
     <div class="container">
         <header class="app-header">
             <h1 class="app-title">Motion Recorder</h1>
             <p class="app-subtitle">High-frequency sensor data recording</p>
+            <div id="online-status" class="online-status online" aria-live="polite">Online</div>
         </header>
         
         <div class="card">
             <h2 class="card-title">Sensor Permissions</h2>
             <div class="permissions-grid">
                 <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                     </svg>
                     <span>GPS</span>
-                    <span id="gps-status" class="permission-status status-pending">Pending</span>
+                    <span id="gps-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="gps-retry" class="retry-permission" style="display: none;" aria-label="Retry GPS permission">
+                        Retry
+                    </button>
                 </div>
                 <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
                     </svg>
                     <span>Accelerometer</span>
-                    <span id="accel-status" class="permission-status status-pending">Pending</span>
+                    <span id="accel-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="accel-retry" class="retry-permission" style="display: none;" aria-label="Retry accelerometer permission">
+                        Retry
+                    </button>
                 </div>
                 <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15.75-1.23-4.5-2.67z"/>
                     </svg>
                     <span>Gyroscope</span>
-                    <span id="gyro-status" class="permission-status status-pending">Pending</span>
+                    <span id="gyro-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="gyro-retry" class="retry-permission" style="display: none;" aria-label="Retry gyroscope permission">
+                        Retry
+                    </button>
                 </div>
             </div>
             
             <div class="controls">
-                <div id="status-indicator" class="status-indicator status-idle">
+                <div id="status-indicator" class="status-indicator status-idle" role="status" aria-live="polite">
                     <span>Ready to record</span>
                 </div>
                 
                 <div class="recording-controls">
-                    <button id="start-btn" class="button button-primary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <button id="start-btn" class="button button-primary" aria-describedby="recording-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <circle cx="12" cy="12" r="10"/>
                         </svg>
                         START RECORDING
                     </button>
-                    <button id="stop-btn" class="button button-error" style="display: none;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <button id="stop-btn" class="button button-error" style="display: none;" aria-describedby="recording-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <rect x="6" y="6" width="12" height="12"/>
                         </svg>
                         STOP RECORDING
                     </button>
                 </div>
                 
+                <div id="recording-help" class="help-text">
+                    Recording will capture GPS location, accelerometer, and gyroscope data at high frequency.
+                </div>
+                
                 <div id="post-recording-controls" class="post-recording-controls">
-                    <button id="download-btn" class="button button-secondary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <button id="download-btn" class="button button-secondary" aria-describedby="download-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                         </svg>
                         DOWNLOAD CSV
                     </button>
-                    <button id="upload-btn" class="button button-secondary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <button id="upload-btn" class="button button-secondary" aria-describedby="upload-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
                         </svg>
                         UPLOAD JSON
                     </button>
+                </div>
+                
+                <div id="download-help" class="help-text">
+                    Download recorded data as CSV file for analysis in spreadsheet applications.
+                </div>
+                <div id="upload-help" class="help-text">
+                    Upload recorded data to server for processing and storage.
                 </div>
             </div>
         </div>
@@ -80,66 +104,120 @@
         <div class="card">
             <h2 class="card-title">Live Sensor Data</h2>
             <div class="data-display">
-                <div class="data-group">
-                    <div class="data-group-title">GPS</div>
+                <div class="data-group" role="group" aria-labelledby="gps-heading">
+                    <div id="gps-heading" class="data-group-title">GPS</div>
                     <div class="data-item">
                         <span class="data-label">Latitude:</span>
-                        <span id="gps-lat" class="data-value">--</span>
+                        <span id="gps-lat" class="data-value" aria-live="polite">--</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Longitude:</span>
-                        <span id="gps-lon" class="data-value">--</span>
+                        <span id="gps-lon" class="data-value" aria-live="polite">--</span>
                     </div>
                     <div class="data-item">
-                        <span class="data-label">Error:</span>
-                        <span id="gps-error" class="data-value">-- m</span>
+                        <span class="data-label">Accuracy:</span>
+                        <span id="gps-error" class="data-value" aria-live="polite">-- m</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Altitude:</span>
-                        <span id="gps-alt" class="data-value">-- m</span>
+                        <span id="gps-alt" class="data-value" aria-live="polite">-- m</span>
                     </div>
                 </div>
                 
-                <div class="data-group">
-                    <div class="data-group-title">Accelerometer</div>
+                <div class="data-group" role="group" aria-labelledby="accel-heading">
+                    <div id="accel-heading" class="data-group-title">Accelerometer</div>
                     <div class="data-item">
                         <span class="data-label">X:</span>
-                        <span id="accel-x" class="data-value">-- m/s²</span>
+                        <span id="accel-x" class="data-value" aria-live="polite">-- m/s²</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Y:</span>
-                        <span id="accel-y" class="data-value">-- m/s²</span>
+                        <span id="accel-y" class="data-value" aria-live="polite">-- m/s²</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Z:</span>
-                        <span id="accel-z" class="data-value">-- m/s²</span>
+                        <span id="accel-z" class="data-value" aria-live="polite">-- m/s²</span>
                     </div>
                 </div>
                 
-                <div class="data-group">
-                    <div class="data-group-title">Gyroscope</div>
+                <div class="data-group" role="group" aria-labelledby="gyro-heading">
+                    <div id="gyro-heading" class="data-group-title">Gyroscope</div>
                     <div class="data-item">
                         <span class="data-label">Alpha:</span>
-                        <span id="gyro-alpha" class="data-value">-- °/s</span>
+                        <span id="gyro-alpha" class="data-value" aria-live="polite">-- °/s</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Beta:</span>
-                        <span id="gyro-beta" class="data-value">-- °/s</span>
+                        <span id="gyro-beta" class="data-value" aria-live="polite">-- °/s</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Gamma:</span>
-                        <span id="gyro-gamma" class="data-value">-- °/s</span>
+                        <span id="gyro-gamma" class="data-value" aria-live="polite">-- °/s</span>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="user-id-display">
-            User ID: <span id="user-id">Loading...</span>
+        <div class="card">
+            <h2 class="card-title">Application Info</h2>
+            <div class="app-info">
+                <div class="info-item">
+                    <span class="info-label">User ID:</span>
+                    <span id="user-id" class="info-value">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Version:</span>
+                    <span class="info-value">1.0.0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status:</span>
+                    <span id="app-status" class="info-value">Ready</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="privacy-notice">
+            <p><strong>Privacy Notice:</strong> This application collects location and motion sensor data for research purposes. Data is stored locally on your device and only uploaded when you explicitly choose to do so. No data is transmitted without your consent.</p>
         </div>
     </div>
     
+    <!-- Notification container -->
+    <div id="notification" class="notification" role="alert" aria-live="assertive"></div>
+    
+    <!-- Loading indicator -->
+    <div id="loading" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing...</div>
+    </div>
+    
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Feature detection and fallbacks -->
+    <script>
+        // Check for required features
+        const requiredFeatures = {
+            serviceWorker: 'serviceWorker' in navigator,
+            indexedDB: 'indexedDB' in window,
+            geolocation: 'geolocation' in navigator,
+            deviceMotion: 'DeviceMotionEvent' in window,
+            webWorkers: typeof Worker !== 'undefined'
+        };
+        
+        // Display feature support info for debugging
+        if (window.location.search.includes('debug=true')) {
+            console.log('Feature support:', requiredFeatures);
+        }
+        
+        // Warn about missing critical features
+        const missingFeatures = Object.entries(requiredFeatures)
+            .filter(([, supported]) => !supported)
+            .map(([feature]) => feature);
+            
+        if (missingFeatures.length > 0) {
+            console.warn('Missing features:', missingFeatures);
+        }
+    </script>
 </body>
 </html>
