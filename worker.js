@@ -1,26 +1,26 @@
-// worker.js - Web Worker for Motion Recorder PWA
+// worker.js - Optimized for high-frequency data processing
 // This runs in a separate thread - no access to window, DOM, or external scripts
 
-// State management
+// Use larger buffers for 140Hz operation
+const BUFFER_FLUSH_SIZE = 2000; // Increased buffer size
+const BUFFER_FLUSH_INTERVAL = 2000; // Flush every 2 seconds
+const MAX_BUFFER_SIZE = 5000; // Emergency flush threshold
+
+// Pre-allocate arrays for better performance
 let recordingData = [];
-let isRecording = false;
 let dataBuffer = [];
+let statsBuffer = new Array(100).fill(0); // Circular buffer for rate calculation
+let statsIndex = 0;
+let isRecording = false;
 
-// Replace these constants at the top of worker.js
-const BUFFER_FLUSH_SIZE = 2000; // Changed from 1000
-const BUFFER_FLUSH_INTERVAL = 2000; // Changed from 5000
-const MAX_BUFFER_SIZE = 5000; // Add this new constant
-
-
-// Performance monitoring
+// Performance monitoring with reduced overhead
 let stats = {
     totalPoints: 0,
     startTime: null,
     lastFlush: null,
     averageRate: 0,
-    peakRate: 0,
-    minRate: Infinity,
-    sampleRates: []
+    currentBatch: 0,
+    lastStatsUpdate: 0
 };
 
 // Set up periodic buffer flush
@@ -30,60 +30,59 @@ let flushIntervalId = setInterval(() => {
     }
     
     // Calculate real-time statistics
-    if (isRecording && stats.sampleRates.length > 0) {
+    if (isRecording && statsBuffer.some(rate => rate > 0)) {
         updateStatistics();
     }
 }, BUFFER_FLUSH_INTERVAL);
 
+// Optimized flush function
 function flushBuffer() {
     if (dataBuffer.length === 0) return;
     
-    // Add all buffered data to recording
-    recordingData.push(...dataBuffer);
-    const flushedCount = dataBuffer.length;
-    dataBuffer = [];
+    const batchSize = dataBuffer.length;
     
-    // Update stats
-    stats.totalPoints += flushedCount;
-    stats.lastFlush = Date.now();
-    
-    if (stats.startTime) {
-        const elapsed = (Date.now() - stats.startTime) / 1000;
-        const currentRate = flushedCount / (BUFFER_FLUSH_INTERVAL / 1000);
-        
-        // Track sample rates for statistics
-        stats.sampleRates.push(currentRate);
-        if (stats.sampleRates.length > 20) {
-            stats.sampleRates.shift(); // Keep last 20 samples
-        }
-        
-        // Calculate average rate
-        stats.averageRate = stats.totalPoints / elapsed;
-        
-        // Track peak and min rates
-        if (currentRate > stats.peakRate) {
-            stats.peakRate = currentRate;
-        }
-        if (currentRate < stats.minRate && currentRate > 0) {
-            stats.minRate = currentRate;
-        }
+    // Use more efficient array operations
+    if (recordingData.length === 0) {
+        recordingData = [...dataBuffer];
+    } else {
+        recordingData.push(...dataBuffer);
     }
     
-    // Send stats update to main thread
-    self.postMessage({
-        type: 'STATS_UPDATE',
-        data: {
-            totalPoints: stats.totalPoints,
-            bufferSize: dataBuffer.length,
-            averageHz: stats.averageRate,
-            peakHz: stats.peakRate,
-            currentHz: stats.sampleRates[stats.sampleRates.length - 1] || 0
-        }
-    });
+    dataBuffer.length = 0; // Fast array clear
+    
+    // Update stats efficiently
+    stats.totalPoints += batchSize;
+    stats.lastFlush = Date.now();
+    
+    // Calculate rate using circular buffer
+    if (stats.startTime) {
+        const elapsed = (Date.now() - stats.startTime) / 1000;
+        const currentRate = batchSize / (BUFFER_FLUSH_INTERVAL / 1000);
+        
+        statsBuffer[statsIndex] = currentRate;
+        statsIndex = (statsIndex + 1) % statsBuffer.length;
+        
+        stats.averageRate = stats.totalPoints / elapsed;
+    }
+    
+    // Throttle stats updates to reduce message overhead
+    const now = Date.now();
+    if (now - stats.lastStatsUpdate > 1000) { // Update every second
+        self.postMessage({
+            type: 'STATS_UPDATE',
+            data: {
+                totalPoints: stats.totalPoints,
+                bufferSize: dataBuffer.length,
+                averageHz: stats.averageRate,
+                currentBatch: batchSize
+            }
+        });
+        stats.lastStatsUpdate = now;
+    }
 }
 
 function updateStatistics() {
-    const recentRates = stats.sampleRates.slice(-5); // Last 5 samples
+    const recentRates = statsBuffer.filter(rate => rate > 0).slice(-5); // Last 5 non-zero samples
     const currentRate = recentRates.length > 0
         ? recentRates.reduce((a, b) => a + b, 0) / recentRates.length
         : 0;
@@ -94,7 +93,6 @@ function updateStatistics() {
             totalPoints: stats.totalPoints + dataBuffer.length,
             bufferSize: dataBuffer.length,
             averageHz: stats.averageRate,
-            peakHz: stats.peakRate,
             currentHz: currentRate
         }
     });
@@ -142,14 +140,15 @@ function startRecording() {
     recordingData = [];
     dataBuffer = [];
     isRecording = true;
+    statsBuffer.fill(0);
+    statsIndex = 0;
     stats = {
         totalPoints: 0,
         startTime: Date.now(),
         lastFlush: Date.now(),
         averageRate: 0,
-        peakRate: 0,
-        minRate: Infinity,
-        sampleRates: []
+        currentBatch: 0,
+        lastStatsUpdate: 0
     };
     
     self.postMessage({ type: 'RECORDING_STARTED' });
@@ -170,8 +169,8 @@ function stopRecording() {
         totalPoints: stats.totalPoints,
         duration: duration,
         averageHz: duration > 0 ? stats.totalPoints / duration : 0,
-        peakHz: stats.peakRate,
-        minHz: stats.minRate === Infinity ? 0 : stats.minRate
+        peakHz: Math.max(...statsBuffer.filter(rate => rate > 0)),
+        minHz: Math.min(...statsBuffer.filter(rate => rate > 0)) || 0
     };
     
     console.log('Worker: Recording stopped. Stats:', finalStats);
@@ -194,20 +193,31 @@ function addDataPoint(data) {
     
     dataBuffer.push(data);
     
-    // Flush if buffer is getting large
-    if (dataBuffer.length >= BUFFER_FLUSH_SIZE) {
+    // Emergency flush for memory management
+    if (dataBuffer.length >= MAX_BUFFER_SIZE) {
+        console.warn('Worker: Emergency buffer flush at', dataBuffer.length, 'points');
+        flushBuffer();
+    } else if (dataBuffer.length >= BUFFER_FLUSH_SIZE) {
         flushBuffer();
     }
 }
 
+// Optimized batch processing
 function addDataBatch(data) {
-    if (!isRecording || !Array.isArray(data)) return;
+    if (!isRecording || !Array.isArray(data) || data.length === 0) return;
     
-    // Add all points from batch
-    dataBuffer.push(...data);
+    // Direct array concatenation is faster than push(...data) for large arrays
+    if (data.length > 100) {
+        dataBuffer = dataBuffer.concat(data);
+    } else {
+        dataBuffer.push(...data);
+    }
     
-    // Flush if buffer is getting large
-    if (dataBuffer.length >= BUFFER_FLUSH_SIZE) {
+    // Emergency flush for memory management
+    if (dataBuffer.length >= MAX_BUFFER_SIZE) {
+        console.warn('Worker: Emergency buffer flush at', dataBuffer.length, 'points');
+        flushBuffer();
+    } else if (dataBuffer.length >= BUFFER_FLUSH_SIZE) {
         flushBuffer();
     }
 }
@@ -217,7 +227,6 @@ function sendStats() {
         totalPoints: stats.totalPoints + dataBuffer.length,
         bufferSize: dataBuffer.length,
         averageHz: stats.averageRate,
-        peakHz: stats.peakRate,
         isRecording: isRecording
     };
     
@@ -230,168 +239,180 @@ function sendStats() {
 function clearData() {
     recordingData = [];
     dataBuffer = [];
+    statsBuffer.fill(0);
+    statsIndex = 0;
     stats = {
         totalPoints: 0,
         startTime: null,
         lastFlush: null,
         averageRate: 0,
-        peakRate: 0,
-        minRate: Infinity,
-        sampleRates: []
+        currentBatch: 0,
+        lastStatsUpdate: 0
     };
     
     console.log('Worker: Data cleared');
 }
 
+// Optimized CSV generation with streaming approach
 function generateCSV(data) {
     try {
         console.log('Worker: Generating CSV for', data.length, 'data points');
         
         const headers = [
-            'Recording Date Timestamp',
-            'User ID',
-            'GPS Date Timestamp',
-            'GPS LAT',
-            'GPS LON',
-            'GPS ERROR',
-            'GPS ALT',
-            'GPS ALT ACCURACY',
-            'GPS HEADING',
-            'GPS SPEED',
-            'Accel Date Timestamp',
-            'Accel X',
-            'Accel Y',
-            'Accel Z',
-            'Gyro Date Timestamp',
-            'Gyro Alpha',
-            'Gyro Beta',
-            'Gyro Gamma',
-            'Sample Time (ms)',
-            'Frequency (Hz)'
+            'Recording Date Timestamp', 'User ID', 'GPS Date Timestamp',
+            'GPS LAT', 'GPS LON', 'GPS ERROR', 'GPS ALT', 'GPS ALT ACCURACY',
+            'GPS HEADING', 'GPS SPEED', 'Accel Date Timestamp',
+            'Accel X', 'Accel Y', 'Accel Z', 'Gyro Date Timestamp',
+            'Gyro Alpha', 'Gyro Beta', 'Gyro Gamma', 'Sample Time (ms)', 'Frequency (Hz)'
         ];
         
-        let csvContent = headers.join(',') + '\n';
+        // Use array for better performance than string concatenation
+        const csvLines = [headers.join(',')];
         
-        // Sort data by timestamp for proper ordering
+        // Sort data once
         if (data && data.length > 0) {
             data.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         }
         
         let lastTimestamp = null;
-        let frequencyWindow = [];
+        const frequencyWindow = new Array(10).fill(0);
+        let windowIndex = 0;
         
-        for (let i = 0; i < data.length; i++) {
-            const point = data[i];
+        // Process in chunks to avoid blocking
+        const CHUNK_SIZE = 1000;
+        let currentIndex = 0;
+        
+        function processChunk() {
+            const endIndex = Math.min(currentIndex + CHUNK_SIZE, data.length);
             
-            // Calculate time delta and instantaneous frequency
-            let sampleTime = 0;
-            let frequency = 0;
-            
-            if (lastTimestamp && point.timestamp) {
-                sampleTime = point.timestamp - lastTimestamp;
-                if (sampleTime > 0) {
-                    frequency = 1000 / sampleTime; // Convert to Hz
-                    frequencyWindow.push(frequency);
-                    if (frequencyWindow.length > 10) {
-                        frequencyWindow.shift();
+            for (let i = currentIndex; i < endIndex; i++) {
+                const point = data[i];
+                
+                // Efficient frequency calculation
+                let sampleTime = 0;
+                let frequency = 0;
+                
+                if (lastTimestamp && point.timestamp) {
+                    sampleTime = point.timestamp - lastTimestamp;
+                    if (sampleTime > 0) {
+                        frequency = 1000 / sampleTime;
+                        frequencyWindow[windowIndex] = frequency;
+                        windowIndex = (windowIndex + 1) % frequencyWindow.length;
                     }
                 }
+                lastTimestamp = point.timestamp;
+                
+                // Calculate average frequency
+                const avgFrequency = frequencyWindow.reduce((a, b) => a + b, 0) / frequencyWindow.length;
+                
+                // Build row efficiently
+                const row = [
+                    escapeCSVField(point.recordingTimestamp || ''),
+                    escapeCSVField(point.userId || ''),
+                    escapeCSVField(point.gpsTimestamp || ''),
+                    formatNumber(point.gpsLat),
+                    formatNumber(point.gpsLon),
+                    formatNumber(point.gpsError),
+                    formatNumber(point.gpsAlt),
+                    formatNumber(point.gpsAltAccuracy),
+                    formatNumber(point.gpsHeading),
+                    formatNumber(point.gpsSpeed),
+                    escapeCSVField(point.accelTimestamp || ''),
+                    formatNumber(point.accelX),
+                    formatNumber(point.accelY),
+                    formatNumber(point.accelZ),
+                    escapeCSVField(point.gyroTimestamp || ''),
+                    formatNumber(point.gyroAlpha),
+                    formatNumber(point.gyroBeta),
+                    formatNumber(point.gyroGamma),
+                    sampleTime.toFixed(2),
+                    avgFrequency.toFixed(2)
+                ];
+                
+                csvLines.push(row.join(','));
             }
-            lastTimestamp = point.timestamp;
             
-            // Calculate average frequency over window
-            const avgFrequency = frequencyWindow.length > 0 
-                ? frequencyWindow.reduce((a, b) => a + b, 0) / frequencyWindow.length 
+            currentIndex = endIndex;
+            
+            // Continue processing or finish
+            if (currentIndex < data.length) {
+                // Use setTimeout for non-blocking processing
+                setTimeout(processChunk, 0);
+            } else {
+                finishCSV();
+            }
+        }
+        
+        function finishCSV() {
+            // Add summary statistics
+            const duration = data.length > 1 
+                ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
                 : 0;
+            const averageHz = duration > 0 ? data.length / duration : 0;
             
-            const row = [
-                escapeCSVField(point.recordingTimestamp || ''),
-                escapeCSVField(point.userId || ''),
-                escapeCSVField(point.gpsTimestamp || ''),
-                formatNumber(point.gpsLat),
-                formatNumber(point.gpsLon),
-                formatNumber(point.gpsError),
-                formatNumber(point.gpsAlt),
-                formatNumber(point.gpsAltAccuracy),
-                formatNumber(point.gpsHeading),
-                formatNumber(point.gpsSpeed),
-                escapeCSVField(point.accelTimestamp || ''),
-                formatNumber(point.accelX),
-                formatNumber(point.accelY),
-                formatNumber(point.accelZ),
-                escapeCSVField(point.gyroTimestamp || ''),
-                formatNumber(point.gyroAlpha),
-                formatNumber(point.gyroBeta),
-                formatNumber(point.gyroGamma),
-                sampleTime.toFixed(2),
-                avgFrequency.toFixed(2)
-            ];
-            csvContent += row.join(',') + '\n';
+            // Count different data types
+            const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
+            const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
+            const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
+            
+            csvLines.push('');
+            csvLines.push('# Summary Statistics');
+            csvLines.push(`# Total Samples,${data.length}`);
+            csvLines.push(`# GPS Samples,${gpsCount}`);
+            csvLines.push(`# Accelerometer Samples,${accelCount}`);
+            csvLines.push(`# Gyroscope Samples,${gyroCount}`);
+            csvLines.push(`# Duration (seconds),${duration.toFixed(2)}`);
+            csvLines.push(`# Average Sample Rate (Hz),${averageHz.toFixed(2)}`);
+            
+            if (gpsCount > 0) {
+                csvLines.push(`# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}`);
+            }
+            if (accelCount > 0) {
+                csvLines.push(`# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}`);
+            }
+            if (gyroCount > 0) {
+                csvLines.push(`# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}`);
+            }
+            
+            const csvContent = csvLines.join('\n');
+            console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
+            
+            self.postMessage({ 
+                type: 'CSV_GENERATED', 
+                data: csvContent 
+            });
         }
         
-        // Add summary statistics
-        const duration = data.length > 1 
-            ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
-            : 0;
-        const averageHz = duration > 0 ? data.length / duration : 0;
-        
-        // Count different data types
-        const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
-        const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
-        const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
-        
-        csvContent += '\n# Summary Statistics\n';
-        csvContent += `# Total Samples,${data.length}\n`;
-        csvContent += `# GPS Samples,${gpsCount}\n`;
-        csvContent += `# Accelerometer Samples,${accelCount}\n`;
-        csvContent += `# Gyroscope Samples,${gyroCount}\n`;
-        csvContent += `# Duration (seconds),${duration.toFixed(2)}\n`;
-        csvContent += `# Average Sample Rate (Hz),${averageHz.toFixed(2)}\n`;
-        
-        if (gpsCount > 0) {
-            csvContent += `# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}\n`;
-        }
-        if (accelCount > 0) {
-            csvContent += `# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}\n`;
-        }
-        if (gyroCount > 0) {
-            csvContent += `# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}\n`;
-        }
-        
-        console.log('Worker: CSV generated successfully');
-        console.log('Worker: Summary - Total:', data.length, 'Duration:', duration.toFixed(2), 's', 'Rate:', averageHz.toFixed(2), 'Hz');
-        
-        self.postMessage({ 
-            type: 'CSV_GENERATED', 
-            data: csvContent 
-        });
+        // Start processing
+        processChunk();
         
     } catch (error) {
         console.error('Worker: Error generating CSV:', error);
         self.postMessage({
             type: 'WORKER_ERROR',
-            error: `Failed to generate CSV: ${error.message}`
+            data: `Failed to generate CSV: ${error.message}`
         });
     }
 }
 
+// Optimized number formatting
 function formatNumber(value) {
-    if (value === undefined || value === null || value === '') {
-        return '';
-    }
+    if (value == null || value === '') return '';
+    
     if (typeof value === 'number') {
-        // Format with appropriate precision
-        if (Number.isInteger(value)) {
+        // Fast path for integers
+        if (value === Math.floor(value)) {
             return value.toString();
+        }
+        
+        // Use appropriate precision based on magnitude
+        if (Math.abs(value) > 100) {
+            return value.toFixed(2);
         } else {
-            // Use 6 decimal places for coordinates, 2 for other values
-            if (Math.abs(value) < 1000 && (value.toString().includes('.')  && value.toString().split('.')[1].length > 2)) {
-                return value.toFixed(6);
-            } else {
-                return value.toFixed(2);
-            }
+            return value.toFixed(6);
         }
     }
+    
     return value.toString();
 }
 
@@ -417,7 +438,7 @@ self.addEventListener('error', function(error) {
     console.error('Worker error:', error);
     self.postMessage({
         type: 'WORKER_ERROR',
-        error: error.message || 'Unknown worker error'
+        data: error.message || 'Unknown worker error'
     });
 });
 
@@ -426,8 +447,8 @@ self.addEventListener('unhandledrejection', function(event) {
     console.error('Worker unhandled rejection:', event.reason);
     self.postMessage({
         type: 'WORKER_ERROR',
-        error: event.reason || 'Unhandled promise rejection'
+        data: event.reason || 'Unhandled promise rejection'
     });
 });
 
-console.log('Worker: Initialized and ready. Version 1.0.0');
+console.log('Worker: Initialized and ready. Version 1.1.0 - Optimized for 140Hz');
