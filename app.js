@@ -33,6 +33,13 @@ if (typeof window !== 'undefined' && typeof nanoid === 'undefined') {
 // Rest of app.js remains the same...
 // [Include the rest of your app.js code here, but replace the initUserId method with this:]
 
+// NanoID fallback if CDN fails
+if (typeof nanoid === 'undefined') {
+    window.nanoid = () => Math.random().toString(36).substring(2, 12);
+}
+
+
+
 async initUserId() {
     // Check for existing user ID in cookie
     const cookies = document.cookie.split(';');
@@ -1076,6 +1083,20 @@ class MotionRecorderApp {
         }
     }
 }
+
+// Add these methods to your MotionRecorderApp class
+updateAccelUI(x, y, z) {
+    document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
+    document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
+    document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+}
+
+updateGyroUI(alpha, beta, gamma) {
+    document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
+    document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
+    document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+}
+
 
 // Initialize the app when DOM is loaded
 if (document.readyState === 'loading') {
