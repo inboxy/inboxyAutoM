@@ -1,3 +1,80 @@
+// ============================================
+// app.js - CORRECTED VERSION
+// ============================================
+
+// Robust ID generation fallback (no dependency on nanoid)
+function generateId(length = 10) {
+    // First try crypto API (most secure)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const array = new Uint8Array(length);
+        crypto.getRandomValues(array);
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result += chars[array[i] % chars.length];
+        }
+        return result;
+    }
+    
+    // Fallback to Math.random
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Try to use nanoid if it loaded from CDN, otherwise use our fallback
+if (typeof window !== 'undefined' && typeof nanoid === 'undefined') {
+    window.nanoid = generateId;
+}
+
+// Rest of app.js remains the same...
+// [Include the rest of your app.js code here, but replace the initUserId method with this:]
+
+async initUserId() {
+    // Check for existing user ID in cookie
+    const cookies = document.cookie.split(';');
+    let userId = null;
+    
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'userId') {
+            userId = value;
+            break;
+        }
+    }
+    
+    if (!userId) {
+        // Generate new 10 character unique ID
+        // Use nanoid if available, otherwise use our fallback
+        if (typeof nanoid === 'function') {
+            userId = nanoid(10);
+        } else {
+            userId = generateId(10);
+        }
+        
+        // Store in cookie (expires in 1 year)
+        const expires = new Date();
+        expires.setFullYear(expires.getFullYear() + 1);
+        
+        // Add Secure flag only if on HTTPS
+        const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `userId=${userId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
+    }
+    
+    this.userId = userId;
+    const userIdElement = document.getElementById('user-id');
+    if (userIdElement) {
+        userIdElement.textContent = userId;
+    }
+}
+
+
+
+
+
 // NanoID fallback if CDN fails
 if (typeof nanoid === 'undefined') {
     window.nanoid = () => Math.random().toString(36).substring(2, 12);
