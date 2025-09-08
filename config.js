@@ -1,164 +1,6 @@
 // Configuration file for Motion Recorder PWA - Optimized for 140Hz
 // This file should be customized for your deployment environment
 
-// Enhanced device capability detection for optimal 140Hz performance
-const detectOptimalConfiguration = () => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isIOS = /iphone|ipad|ipod/.test(ua);
-    const isAndroid = /android/.test(ua);
-    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
-    const isChrome = /chrome/.test(ua);
-    
-    // Hardware detection
-    const cores = navigator.hardwareConcurrency || 2;
-    const memory = navigator.deviceMemory || 2;
-    const connection = navigator.connection;
-    
-    const config = window.MotionRecorderConfig;
-    
-    // Platform-specific optimizations
-    if (isIOS) {
-        // iOS devices typically support up to 60Hz reliably
-        config.sensors.targetRate = Math.min(100, config.sensors.targetRate);
-        config.sensors.fallbackRate = 60;
-        config.sensors.batchSize = 5; // Smaller batches for iOS
-        
-        // iOS Safari has stricter memory limits
-        config.storage.maxDataPoints = 75000;
-        config.sensors.maxBufferSize = 3000;
-    } else if (isAndroid) {
-        // Android varies widely, adjust based on hardware
-        if (cores >= 8 && memory >= 6) {
-            // High-end Android
-            config.sensors.targetRate = 140;
-            config.sensors.batchSize = 15;
-        } else if (cores >= 4 && memory >= 4) {
-            // Mid-range Android
-            config.sensors.targetRate = 100;
-            config.sensors.batchSize = 10;
-        } else {
-            // Low-end Android
-            config.sensors.targetRate = 60;
-            config.sensors.batchSize = 5;
-        }
-    }
-    
-    // Browser-specific optimizations
-    if (isChrome) {
-        // Chrome generally handles high frequencies better
-        config.performance.useRequestAnimationFrame = true;
-        config.sensors.batchInterval = 50; // More frequent batching
-    } else if (isSafari) {
-        // Safari is more conservative
-        config.sensors.batchInterval = 200;
-        config.performance.throttleUIUpdates = true;
-    }
-    
-    // Network-based adjustments
-    if (connection) {
-        if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
-            config.api.timeout = 60000;
-            config.features.backgroundSync = false;
-        }
-        
-        if (connection.saveData) {
-            config.export.compressExports = true;
-            config.features.analytics = false;
-        }
-    }
-    
-    // Memory-based adjustments
-    if (memory < 2) {
-        config.storage.maxDataPoints = 25000;
-        config.sensors.maxBufferSize = 1000;
-        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
-    } else if (memory >= 8) {
-        config.storage.maxDataPoints = 200000;
-        config.sensors.maxBufferSize = 10000;
-    }
-    
-    // CPU-based adjustments
-    if (cores < 4) {
-        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
-        config.performance.throttleUIUpdates = true;
-        config.performance.uiUpdateRate = 5; // Slower UI updates
-    }
-    
-    console.log('Optimal configuration detected:', {
-        platform: isIOS ? 'iOS' : isAndroid ? 'Android' : 'Other',
-        browser: isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other',
-        cores,
-        memory,
-        targetRate: config.sensors.targetRate,
-        maxBuffer: config.sensors.maxBufferSize
-    });
-    
-    return config;
-};
-
-// Performance testing function
-const testDeviceCapability = () => {
-    return new Promise((resolve) => {
-        let sampleCount = 0;
-        let startTime = performance.now();
-        const testDuration = 2000; // 2 seconds
-        
-        const testHandler = () => {
-            sampleCount++;
-        };
-        
-        // Test with devicemotion if available
-        if ('DeviceMotionEvent' in window) {
-            window.addEventListener('devicemotion', testHandler);
-            
-            setTimeout(() => {
-                window.removeEventListener('devicemotion', testHandler);
-                const actualRate = sampleCount / (testDuration / 1000);
-                
-                console.log(`Device capability test: ${actualRate.toFixed(1)} Hz over ${testDuration}ms`);
-                
-                // Adjust target rate based on actual capability
-                const config = window.MotionRecorderConfig;
-                if (actualRate < 30) {
-                    config.sensors.targetRate = 30;
-                } else if (actualRate < 60) {
-                    config.sensors.targetRate = 60;
-                } else if (actualRate < 100) {
-                    config.sensors.targetRate = 100;
-                } else {
-                    config.sensors.targetRate = Math.min(140, actualRate);
-                }
-                
-                resolve({
-                    testedRate: actualRate,
-                    recommendedRate: config.sensors.targetRate
-                });
-            }, testDuration);
-        } else {
-            resolve({
-                testedRate: 0,
-                recommendedRate: 30
-            });
-        }
-    });
-};
-
-// Auto-configuration on load
-document.addEventListener('DOMContentLoaded', async () => {
-    detectOptimalConfiguration();
-    
-    // Optional: Test actual device capability
-    if (window.MotionRecorderConfig.development.verboseLogging) {
-        try {
-            const testResult = await testDeviceCapability();
-            console.log('Device capability test completed:', testResult);
-        } catch (error) {
-            console.warn('Device capability test failed:', error);
-        }
-    }
-});
-
-
 window.MotionRecorderConfig = {
     // API Configuration
     api: {
@@ -175,7 +17,7 @@ window.MotionRecorderConfig = {
         targetRate: 140, // Target 140Hz for high-frequency sampling
         fallbackRate: 60, // Fallback rate for devices that can't handle 140Hz
         adaptiveRateEnabled: true, // Automatically adjust based on device capability
-        gpsUpdateInterval: 300, // GPS updates every 1/3 second
+        gpsUpdateInterval: 1000, // GPS updates every second
         maxRecordingDuration: 3600000, // 1 hour in milliseconds
         dataValidation: true,
         maxBufferSize: 5000, // Maximum data points before forced flush
@@ -296,7 +138,90 @@ if (window.location.protocol === 'https:' && !window.location.hostname.includes(
     window.MotionRecorderConfig.performance.enableProfiling = false;
 }
 
-// Device-specific optimizations
+// Enhanced device capability detection for optimal 140Hz performance
+const detectOptimalConfiguration = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
+    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+    const isChrome = /chrome/.test(ua);
+    
+    // Hardware detection
+    const cores = navigator.hardwareConcurrency || 2;
+    const memory = navigator.deviceMemory || 2;
+    const connection = navigator.connection;
+    
+    const config = window.MotionRecorderConfig;
+    
+    // Platform-specific optimizations
+    if (isIOS) {
+        config.sensors.targetRate = Math.min(100, config.sensors.targetRate);
+        config.sensors.fallbackRate = 60;
+        config.sensors.batchSize = 5;
+        config.storage.maxDataPoints = 75000;
+        config.sensors.maxBufferSize = 3000;
+    } else if (isAndroid) {
+        if (cores >= 8 && memory >= 6) {
+            config.sensors.targetRate = 140;
+            config.sensors.batchSize = 15;
+        } else if (cores >= 4 && memory >= 4) {
+            config.sensors.targetRate = 100;
+            config.sensors.batchSize = 10;
+        } else {
+            config.sensors.targetRate = 60;
+            config.sensors.batchSize = 5;
+        }
+    }
+    
+    // Browser-specific optimizations
+    if (isChrome) {
+        config.performance.useRequestAnimationFrame = true;
+        config.sensors.batchInterval = 50;
+    } else if (isSafari) {
+        config.sensors.batchInterval = 200;
+        config.performance.throttleUIUpdates = true;
+    }
+    
+    // Network and memory adjustments
+    if (connection) {
+        if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
+            config.api.timeout = 60000;
+            config.features.backgroundSync = false;
+        }
+        if (connection.saveData) {
+            config.export.compressExports = true;
+            config.features.analytics = false;
+        }
+    }
+    
+    if (memory < 2) {
+        config.storage.maxDataPoints = 25000;
+        config.sensors.maxBufferSize = 1000;
+        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
+    } else if (memory >= 8) {
+        config.storage.maxDataPoints = 200000;
+        config.sensors.maxBufferSize = 10000;
+    }
+    
+    if (cores < 4) {
+        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
+        config.performance.throttleUIUpdates = true;
+        config.performance.uiUpdateRate = 5;
+    }
+    
+    console.log('Optimal configuration detected:', {
+        platform: isIOS ? 'iOS' : isAndroid ? 'Android' : 'Other',
+        browser: isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other',
+        cores,
+        memory,
+        targetRate: config.sensors.targetRate,
+        maxBuffer: config.sensors.maxBufferSize
+    });
+    
+    return config;
+};
+
+// Device-specific optimizations (legacy function for compatibility)
 const detectDeviceCapabilities = () => {
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
@@ -335,6 +260,45 @@ const detectDeviceCapabilities = () => {
         cores: navigator.hardwareConcurrency,
         memory: navigator.deviceMemory,
         targetRate: window.MotionRecorderConfig.sensors.targetRate
+    });
+};
+
+// Performance testing function
+const testDeviceCapability = () => {
+    return new Promise((resolve) => {
+        let sampleCount = 0;
+        const testDuration = 2000;
+        
+        const testHandler = () => sampleCount++;
+        
+        if ('DeviceMotionEvent' in window) {
+            window.addEventListener('devicemotion', testHandler);
+            
+            setTimeout(() => {
+                window.removeEventListener('devicemotion', testHandler);
+                const actualRate = sampleCount / (testDuration / 1000);
+                
+                console.log(`Device capability test: ${actualRate.toFixed(1)} Hz over ${testDuration}ms`);
+                
+                const config = window.MotionRecorderConfig;
+                if (actualRate < 30) {
+                    config.sensors.targetRate = 30;
+                } else if (actualRate < 60) {
+                    config.sensors.targetRate = 60;
+                } else if (actualRate < 100) {
+                    config.sensors.targetRate = 100;
+                } else {
+                    config.sensors.targetRate = Math.min(140, actualRate);
+                }
+                
+                resolve({
+                    testedRate: actualRate,
+                    recommendedRate: config.sensors.targetRate
+                });
+            }, testDuration);
+        } else {
+            resolve({ testedRate: 0, recommendedRate: 30 });
+        }
     });
 };
 
@@ -421,20 +385,26 @@ const optimizeForPerformance = () => {
     console.log('Performance optimizations applied');
 };
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = window.MotionRecorderConfig;
-}
-
 // Initialize configuration when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    detectDeviceCapabilities();
-    optimizeForPerformance();
-    const isValid = validateConfig();
+document.addEventListener('DOMContentLoaded', async () => {
+    detectDeviceCapabilities(); // Keep legacy function for compatibility
+    detectOptimalConfiguration(); // Add the new enhanced function
+    optimizeForPerformance(); // Keep existing function
+    const isValid = validateConfig(); // Keep existing function
     
     if (isValid) {
         console.log('Motion Recorder Configuration loaded successfully');
         console.log('Target sample rate:', window.MotionRecorderConfig.sensors.targetRate, 'Hz');
+        
+        // Optional: Test actual device capability
+        if (window.MotionRecorderConfig.development.verboseLogging) {
+            try {
+                const testResult = await testDeviceCapability();
+                console.log('Device capability test completed:', testResult);
+            } catch (error) {
+                console.warn('Device capability test failed:', error);
+            }
+        }
     }
 });
 
@@ -478,149 +448,7 @@ window.MotionRecorderConfig.reset = function() {
     window.location.reload();
 };
 
-// Add this BEFORE the existing DOMContentLoaded listener in config.js
-
-// Enhanced device capability detection for optimal 140Hz performance
-const detectOptimalConfiguration = () => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isIOS = /iphone|ipad|ipod/.test(ua);
-    const isAndroid = /android/.test(ua);
-    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
-    const isChrome = /chrome/.test(ua);
-    
-    // Hardware detection
-    const cores = navigator.hardwareConcurrency || 2;
-    const memory = navigator.deviceMemory || 2;
-    const connection = navigator.connection;
-    
-    const config = window.MotionRecorderConfig;
-    
-    // Platform-specific optimizations
-    if (isIOS) {
-        config.sensors.targetRate = Math.min(100, config.sensors.targetRate);
-        config.sensors.fallbackRate = 60;
-        config.sensors.batchSize = 5;
-        config.storage.maxDataPoints = 75000;
-        config.sensors.maxBufferSize = 3000;
-    } else if (isAndroid) {
-        if (cores >= 8 && memory >= 6) {
-            config.sensors.targetRate = 140;
-            config.sensors.batchSize = 15;
-        } else if (cores >= 4 && memory >= 4) {
-            config.sensors.targetRate = 100;
-            config.sensors.batchSize = 10;
-        } else {
-            config.sensors.targetRate = 60;
-            config.sensors.batchSize = 5;
-        }
-    }
-    
-    // Browser-specific optimizations
-    if (isChrome) {
-        config.performance.useRequestAnimationFrame = true;
-        config.sensors.batchInterval = 50;
-    } else if (isSafari) {
-        config.sensors.batchInterval = 200;
-        config.performance.throttleUIUpdates = true;
-    }
-    
-    // Network and memory adjustments
-    if (connection) {
-        if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
-            config.api.timeout = 60000;
-            config.features.backgroundSync = false;
-        }
-        if (connection.saveData) {
-            config.export.compressExports = true;
-            config.features.analytics = false;
-        }
-    }
-    
-    if (memory < 2) {
-        config.storage.maxDataPoints = 25000;
-        config.sensors.maxBufferSize = 1000;
-        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
-    } else if (memory >= 8) {
-        config.storage.maxDataPoints = 200000;
-        config.sensors.maxBufferSize = 10000;
-    }
-    
-    if (cores < 4) {
-        config.sensors.targetRate = Math.min(60, config.sensors.targetRate);
-        config.performance.throttleUIUpdates = true;
-        config.performance.uiUpdateRate = 5;
-    }
-    
-    console.log('Optimal configuration detected:', {
-        platform: isIOS ? 'iOS' : isAndroid ? 'Android' : 'Other',
-        browser: isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other',
-        cores,
-        memory,
-        targetRate: config.sensors.targetRate,
-        maxBuffer: config.sensors.maxBufferSize
-    });
-    
-    return config;
-};
-
-// Performance testing function
-const testDeviceCapability = () => {
-    return new Promise((resolve) => {
-        let sampleCount = 0;
-        const testDuration = 2000;
-        
-        const testHandler = () => sampleCount++;
-        
-        if ('DeviceMotionEvent' in window) {
-            window.addEventListener('devicemotion', testHandler);
-            
-            setTimeout(() => {
-                window.removeEventListener('devicemotion', testHandler);
-                const actualRate = sampleCount / (testDuration / 1000);
-                
-                console.log(`Device capability test: ${actualRate.toFixed(1)} Hz over ${testDuration}ms`);
-                
-                const config = window.MotionRecorderConfig;
-                if (actualRate < 30) {
-                    config.sensors.targetRate = 30;
-                } else if (actualRate < 60) {
-                    config.sensors.targetRate = 60;
-                } else if (actualRate < 100) {
-                    config.sensors.targetRate = 100;
-                } else {
-                    config.sensors.targetRate = Math.min(140, actualRate);
-                }
-                
-                resolve({
-                    testedRate: actualRate,
-                    recommendedRate: config.sensors.targetRate
-                });
-            }, testDuration);
-        } else {
-            resolve({ testedRate: 0, recommendedRate: 30 });
-        }
-    });
-};
-
-// REPLACE the existing DOMContentLoaded listener with this:
-document.addEventListener('DOMContentLoaded', async () => {
-    detectDeviceCapabilities(); // Keep your existing function
-    detectOptimalConfiguration(); // Add the new function
-    optimizeForPerformance(); // Keep your existing function
-    const isValid = validateConfig(); // Keep your existing function
-    
-    if (isValid) {
-        console.log('Motion Recorder Configuration loaded successfully');
-        console.log('Target sample rate:', window.MotionRecorderConfig.sensors.targetRate, 'Hz');
-        
-        // Optional: Test actual device capability
-        if (window.MotionRecorderConfig.development.verboseLogging) {
-            try {
-                const testResult = await testDeviceCapability();
-                console.log('Device capability test completed:', testResult);
-            } catch (error) {
-                console.warn('Device capability test failed:', error);
-            }
-        }
-    }
-});
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.MotionRecorderConfig;
+}
