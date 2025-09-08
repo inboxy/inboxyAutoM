@@ -5,8 +5,12 @@
 let recordingData = [];
 let isRecording = false;
 let dataBuffer = [];
-const BUFFER_FLUSH_SIZE = 1000; // Flush buffer every 1000 points
-const BUFFER_FLUSH_INTERVAL = 5000; // Flush buffer every 5 seconds
+
+// Replace these constants at the top of worker.js
+const BUFFER_FLUSH_SIZE = 2000; // Changed from 1000
+const BUFFER_FLUSH_INTERVAL = 2000; // Changed from 5000
+const MAX_BUFFER_SIZE = 5000; // Add this new constant
+
 
 // Performance monitoring
 let stats = {
