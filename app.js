@@ -30,60 +30,6 @@ if (typeof window !== 'undefined' && typeof nanoid === 'undefined') {
     window.nanoid = generateId;
 }
 
-// Rest of app.js remains the same...
-// [Include the rest of your app.js code here, but replace the initUserId method with this:]
-
-
-
-
-
-async initUserId() {
-    // Check for existing user ID in cookie
-    const cookies = document.cookie.split(';');
-    let userId = null;
-    
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'userId') {
-            userId = value;
-            break;
-        }
-    }
-    
-    if (!userId) {
-        // Generate new 10 character unique ID
-        // Use nanoid if available, otherwise use our fallback
-        if (typeof nanoid === 'function') {
-            userId = nanoid(10);
-        } else {
-            userId = generateId(10);
-        }
-        
-        // Store in cookie (expires in 1 year)
-        const expires = new Date();
-        expires.setFullYear(expires.getFullYear() + 1);
-        
-        // Add Secure flag only if on HTTPS
-        const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-        document.cookie = `userId=${userId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
-    }
-    
-    this.userId = userId;
-    const userIdElement = document.getElementById('user-id');
-    if (userIdElement) {
-        userIdElement.textContent = userId;
-    }
-}
-
-
-
-
-
-// NanoID fallback if CDN fails
-if (typeof nanoid === 'undefined') {
-    window.nanoid = () => Math.random().toString(36).substring(2, 12);
-}
-
 // Error boundary for better error handling
 class ErrorBoundary {
     static handle(error, context) {
@@ -126,6 +72,7 @@ class MotionRecorderApp {
         this.batteryLevel = 1;
         this.adaptiveSampleRate = 140; // Start with target rate
         this.recordingTimeout = null;
+        this.cleanupMotion = null;
         
         this.init();
     }
@@ -145,19 +92,42 @@ class MotionRecorderApp {
         }
     }
     
-   
+    async initUserId() {
+        // Check for existing user ID in cookie
+        const cookies = document.cookie.split(';');
+        let userId = null;
+        
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'userId') {
+                userId = value;
+                break;
+            }
+        }
         
         if (!userId) {
-            // Generate new 10 character unique ID using nanoid
-            userId = nanoid(10);
+            // Generate new 10 character unique ID
+            // Use nanoid if available, otherwise use our fallback
+            if (typeof nanoid === 'function') {
+                userId = nanoid(10);
+            } else {
+                userId = generateId(10);
+            }
+            
             // Store in cookie (expires in 1 year)
             const expires = new Date();
             expires.setFullYear(expires.getFullYear() + 1);
-            document.cookie = `userId=${userId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict`;
+            
+            // Add Secure flag only if on HTTPS
+            const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `userId=${userId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
         }
         
         this.userId = userId;
-        document.getElementById('user-id').textContent = userId;
+        const userIdElement = document.getElementById('user-id');
+        if (userIdElement) {
+            userIdElement.textContent = userId;
+        }
     }
     
     async initIndexedDB() {
@@ -478,95 +448,54 @@ class MotionRecorderApp {
     }
     
     startMotionTracking() {
-        // High-performance motion tracking for 140Hz
-        let lastAccelUpdate = 0;
-        let lastGyroUpdate = 0;
-        const targetInterval = 1000 / this.adaptiveSampleRate; // ~7.14ms for 140Hz
+        // Use passive listeners for better performance
+        const options = { passive: true };
         
-        // Data batching for efficiency
+        // Store latest sensor data - no processing in event handler
+        let latestMotionEvent = null;
+        let lastProcessTime = 0;
+        
+        // Minimal event handler - just store data
+        const motionHandler = (event) => {
+            latestMotionEvent = {
+                acceleration: event.accelerationIncludingGravity,
+                rotationRate: event.rotationRate,
+                timestamp: event.timeStamp || performance.now()
+            };
+        };
+        
+        window.addEventListener('devicemotion', motionHandler, options);
+        
+        // High-frequency processing loop
+        const targetInterval = 1000 / this.adaptiveSampleRate; // ~7.14ms for 140Hz
         let accelBatch = [];
         let gyroBatch = [];
-        const BATCH_SIZE = 10;
-        const BATCH_INTERVAL = 100;
+        let lastUIUpdate = 0;
         
-        // Batch sender function
-        const sendBatch = () => {
-            if (this.isRecording) {
-                if (accelBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...accelBatch]
-                    });
-                    accelBatch = [];
-                }
-                if (gyroBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...gyroBatch]
-                    });
-                    gyroBatch = [];
-                }
+        const processMotionData = (currentTime) => {
+            if (!latestMotionEvent) {
+                this.sensorRafId = requestAnimationFrame(processMotionData);
+                return;
             }
-        };
-        
-        // Set up batch interval
-        this.batchInterval = setInterval(sendBatch, BATCH_INTERVAL);
-        
-        // Request high frequency updates (iOS 13+ requirement)
-        if (typeof DeviceMotionEvent !== 'undefined' && 
-            typeof DeviceMotionEvent.requestPermission === 'function') {
-            DeviceMotionEvent.requestPermission()
-                .then(response => {
-                    if (response === 'granted') {
-                        // iOS specific: request high frequency
-                        if (window.DeviceMotionEvent && window.DeviceMotionEvent.interval !== undefined) {
-                            window.DeviceMotionEvent.interval = targetInterval;
-                        }
-                    }
-                });
-        }
-        
-        // Store latest sensor data
-        const sensorData = {
-            acceleration: null,
-            rotationRate: null,
-            timestamp: 0
-        };
-        
-        // High-frequency motion event handler (no throttling here!)
-        const motionHandler = (event) => {
-            sensorData.acceleration = event.accelerationIncludingGravity;
-            sensorData.rotationRate = event.rotationRate;
-            sensorData.timestamp = Date.now();
-        };
-        
-        window.addEventListener('devicemotion', motionHandler, { passive: true });
-        
-        // High-frequency sampling loop using RAF
-        let lastFrameTime = performance.now();
-        
-        const sampleSensors = (currentTime) => {
-            const deltaTime = currentTime - lastFrameTime;
             
-            // Sample at target rate
+            const deltaTime = currentTime - lastProcessTime;
+            
+            // Only process if enough time has passed (rate limiting)
             if (deltaTime >= targetInterval) {
                 const now = Date.now();
                 const timestamp = new Date().toISOString();
                 
-                // Process acceleration data
-                if (sensorData.acceleration) {
-                    const { x, y, z } = sensorData.acceleration;
+                // Process acceleration
+                if (latestMotionEvent.acceleration) {
+                    const { x, y, z } = latestMotionEvent.acceleration;
                     
                     if (this.validateSensorData('accel', { x, y, z })) {
-                        // Update UI (throttle to 10Hz for performance)
-                        if (now - lastAccelUpdate > 100) {
-                            document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-                            document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-                            document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
-                            lastAccelUpdate = now;
+                        // Throttled UI updates (10Hz)
+                        if (currentTime - lastUIUpdate > 100) {
+                            this.updateAccelUI(x, y, z);
+                            lastUIUpdate = currentTime;
                         }
                         
-                        // Add to batch if recording
                         if (this.isRecording) {
                             accelBatch.push({
                                 recordingTimestamp: this.startTime,
@@ -578,37 +507,24 @@ class MotionRecorderApp {
                                 timestamp: now
                             });
                             
-                            // Update performance monitor
+                            // Performance monitoring
                             if (this.performanceMonitor) {
                                 this.performanceMonitor.addSample();
-                            }
-                            
-                            // Send immediately if batch is full
-                            if (accelBatch.length >= BATCH_SIZE) {
-                                this.worker.postMessage({
-                                    type: 'ADD_DATA_BATCH',
-                                    data: [...accelBatch]
-                                });
-                                accelBatch = [];
                             }
                         }
                     }
                 }
                 
-                // Process gyroscope data
-                if (sensorData.rotationRate) {
-                    const { alpha, beta, gamma } = sensorData.rotationRate;
+                // Process gyroscope
+                if (latestMotionEvent.rotationRate) {
+                    const { alpha, beta, gamma } = latestMotionEvent.rotationRate;
                     
                     if (this.validateSensorData('gyro', { alpha, beta, gamma })) {
-                        // Update UI (throttled)
-                        if (now - lastGyroUpdate > 100) {
-                            document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-                            document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
-                            document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
-                            lastGyroUpdate = now;
+                        // Throttled UI updates
+                        if (currentTime - lastUIUpdate > 100) {
+                            this.updateGyroUI(alpha, beta, gamma);
                         }
                         
-                        // Add to batch if recording
                         if (this.isRecording) {
                             gyroBatch.push({
                                 recordingTimestamp: this.startTime,
@@ -619,43 +535,80 @@ class MotionRecorderApp {
                                 gyroGamma: gamma,
                                 timestamp: now
                             });
-                            
-                            // Send immediately if batch is full
-                            if (gyroBatch.length >= BATCH_SIZE) {
-                                this.worker.postMessage({
-                                    type: 'ADD_DATA_BATCH',
-                                    data: [...gyroBatch]
-                                });
-                                gyroBatch = [];
-                            }
                         }
                     }
                 }
                 
-                lastFrameTime = currentTime;
+                // Send batches when they reach target size
+                if (accelBatch.length >= 10) {
+                    this.worker.postMessage({
+                        type: 'ADD_DATA_BATCH',
+                        data: [...accelBatch]
+                    });
+                    accelBatch = [];
+                }
+                
+                if (gyroBatch.length >= 10) {
+                    this.worker.postMessage({
+                        type: 'ADD_DATA_BATCH',
+                        data: [...gyroBatch]
+                    });
+                    gyroBatch = [];
+                }
+                
+                lastProcessTime = currentTime;
             }
             
-            this.sensorRafId = requestAnimationFrame(sampleSensors);
+            this.sensorRafId = requestAnimationFrame(processMotionData);
         };
         
-        // Start the sampling loop
-        this.sensorRafId = requestAnimationFrame(sampleSensors);
+        // Start processing loop
+        this.sensorRafId = requestAnimationFrame(processMotionData);
+        
+        // Periodic batch flush for remaining data
+        this.batchInterval = setInterval(() => {
+            if (accelBatch.length > 0) {
+                this.worker.postMessage({
+                    type: 'ADD_DATA_BATCH',
+                    data: [...accelBatch]
+                });
+                accelBatch = [];
+            }
+            if (gyroBatch.length > 0) {
+                this.worker.postMessage({
+                    type: 'ADD_DATA_BATCH',
+                    data: [...gyroBatch]
+                });
+                gyroBatch = [];
+            }
+        }, 100);
         
         // Store cleanup function
         this.cleanupMotion = () => {
             window.removeEventListener('devicemotion', motionHandler);
+            if (this.sensorRafId) {
+                cancelAnimationFrame(this.sensorRafId);
+            }
+            if (this.batchInterval) {
+                clearInterval(this.batchInterval);
+            }
         };
     }
     
+    // Separate UI update methods for better performance
+    updateAccelUI(x, y, z) {
+        document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
+        document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
+        document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+    }
+    
+    updateGyroUI(alpha, beta, gamma) {
+        document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
+        document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
+        document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+    }
+    
     stopMotionTracking() {
-        if (this.sensorRafId) {
-            cancelAnimationFrame(this.sensorRafId);
-            this.sensorRafId = null;
-        }
-        if (this.batchInterval) {
-            clearInterval(this.batchInterval);
-            this.batchInterval = null;
-        }
         if (this.cleanupMotion) {
             this.cleanupMotion();
             this.cleanupMotion = null;
@@ -666,9 +619,12 @@ class MotionRecorderApp {
         const config = window.MotionRecorderConfig?.sensors;
         if (!config?.dataValidation) return true;
         
+        // Add NaN and Infinity checks
+        const isValidNumber = (val) => typeof val === 'number' && isFinite(val);
+        
         if (type === 'accel') {
             const maxAccel = 50; // m/s²
-            if (data.x === null || data.y === null || data.z === null) return false;
+            if (!Object.values(data).every(isValidNumber)) return false;
             if (Math.abs(data.x) > maxAccel || 
                 Math.abs(data.y) > maxAccel || 
                 Math.abs(data.z) > maxAccel) {
@@ -677,7 +633,7 @@ class MotionRecorderApp {
             }
         } else if (type === 'gyro') {
             const maxGyro = 2000; // degrees/s
-            if (data.alpha === null || data.beta === null || data.gamma === null) return false;
+            if (!Object.values(data).every(isValidNumber)) return false;
             if (Math.abs(data.alpha) > maxGyro || 
                 Math.abs(data.beta) > maxGyro || 
                 Math.abs(data.gamma) > maxGyro) {
@@ -864,251 +820,4 @@ class MotionRecorderApp {
             }
             
             // Show loading indicator
-            this.showLoading(true);
-            
-            // Retrieve data from IndexedDB
-            const transaction = this.db.transaction(['dataPoints'], 'readonly');
-            const store = transaction.objectStore('dataPoints');
-            const index = store.index('recordingId');
-            
-            const request = index.getAll(this.currentRecordingId);
-            request.onsuccess = () => {
-                const data = request.result;
-                this.worker.postMessage({
-                    type: 'GENERATE_CSV',
-                    data: data
-                });
-            };
-            
-        } catch (error) {
-            ErrorBoundary.handle(error, 'Download CSV');
-            this.showLoading(false);
-        }
-    }
-    
-    downloadCSVFile(csvContent) {
-        try {
-            this.showLoading(false);
-            
-            const now = new Date();
-            const year = now.getUTCFullYear();
-            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-            const date = String(now.getUTCDate()).padStart(2, '0');
-            const time = now.toISOString().substr(11, 8).replace(/:/g, '');
-            
-            const filename = `inbx_${this.userId}_${year}_${month}_${date}_${time}.csv`;
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                
-                this.showNotification('CSV file downloaded successfully', 'success');
-            }
-            
-        } catch (error) {
-            ErrorBoundary.handle(error, 'Download CSV File');
-        }
-    }
-    
-    async uploadJSON() {
-        try {
-            if (!this.currentRecordingId) {
-                this.showNotification('No recording available to upload', 'warning');
-                return;
-            }
-            
-            this.showLoading(true);
-            
-            // Retrieve recording and data from IndexedDB
-            const recordingTransaction = this.db.transaction(['recordings'], 'readonly');
-            const recordingStore = recordingTransaction.objectStore('recordings');
-            const recordingRequest = recordingStore.get(this.currentRecordingId);
-            
-            recordingRequest.onsuccess = () => {
-                const recording = recordingRequest.result;
-                
-                const dataTransaction = this.db.transaction(['dataPoints'], 'readonly');
-                const dataStore = dataTransaction.objectStore('dataPoints');
-                const index = dataStore.index('recordingId');
-                const dataRequest = index.getAll(this.currentRecordingId);
-                
-                dataRequest.onsuccess = async () => {
-                    const dataPoints = dataRequest.result;
-                    
-                    const jsonData = {
-                        recording: recording,
-                        dataPoints: dataPoints,
-                        exportTimestamp: new Date().toISOString(),
-                        totalPoints: dataPoints.length,
-                        deviceInfo: {
-                            userAgent: navigator.userAgent,
-                            platform: navigator.platform,
-                            language: navigator.language
-                        }
-                    };
-                    
-                    // Use configured endpoint
-                    const endpoint = window.MotionRecorderConfig?.api?.endpoint || 'https://example.com/api/recordings';
-                    
-                    try {
-                        const response = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(jsonData)
-                        });
-                        
-                        this.showLoading(false);
-                        
-                        if (response.ok) {
-                            this.showNotification('Upload successful!', 'success');
-                            // Mark recording as uploaded
-                            this.markRecordingUploaded(this.currentRecordingId);
-                        } else {
-                            this.showNotification('Upload failed. Please try again.', 'error');
-                        }
-                    } catch (error) {
-                        this.showLoading(false);
-                        console.error('Upload error:', error);
-                        this.showNotification('Upload failed. Please check your connection.', 'error');
-                        // Save for later retry
-                        this.savePendingUpload(jsonData);
-                    }
-                };
-            };
-            
-        } catch (error) {
-            this.showLoading(false);
-            ErrorBoundary.handle(error, 'Upload JSON');
-        }
-    }
-    
-    async markRecordingUploaded(recordingId) {
-        const transaction = this.db.transaction(['recordings'], 'readwrite');
-        const store = transaction.objectStore('recordings');
-        const request = store.get(recordingId);
-        
-        request.onsuccess = () => {
-            const recording = request.result;
-            recording.uploaded = true;
-            recording.uploadedAt = new Date().toISOString();
-            store.put(recording);
-        };
-    }
-    
-    async savePendingUpload(data) {
-        // Save to IndexedDB for later retry
-        const pendingUploads = JSON.parse(localStorage.getItem('pendingUploads') || '[]');
-        pendingUploads.push({
-            id: Date.now(),
-            data: data,
-            timestamp: new Date().toISOString()
-        });
-        localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-    }
-    
-    async uploadPendingData() {
-        const pendingUploads = JSON.parse(localStorage.getItem('pendingUploads') || '[]');
-        if (pendingUploads.length === 0) return;
-        
-        const endpoint = window.MotionRecorderConfig?.api?.endpoint || 'https://example.com/api/recordings';
-        const successfulUploads = [];
-        
-        for (const upload of pendingUploads) {
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(upload.data)
-                });
-                
-                if (response.ok) {
-                    successfulUploads.push(upload.id);
-                }
-            } catch (error) {
-                console.error('Failed to upload pending data:', error);
-            }
-        }
-        
-        // Remove successful uploads
-        if (successfulUploads.length > 0) {
-            const remaining = pendingUploads.filter(u => !successfulUploads.includes(u.id));
-            localStorage.setItem('pendingUploads', JSON.stringify(remaining));
-            this.showNotification(`Successfully uploaded ${successfulUploads.length} pending recording(s)`, 'success');
-        }
-    }
-    
-    showNotification(message, type = 'info') {
-        const notification = document.getElementById('notification');
-        if (!notification) return;
-        
-        notification.textContent = message;
-        notification.className = `notification ${type} show`;
-        
-        setTimeout(() => {
-            notification.classList.remove('show');
-        }, window.MotionRecorderConfig?.ui?.notificationDuration || 5000);
-    }
-    
-    showLoading(show) {
-        const loading = document.getElementById('loading');
-        if (loading) {
-            loading.style.display = show ? 'flex' : 'none';
-        }
-    }
-}
-
-// Add these methods to your MotionRecorderApp class
-updateAccelUI(x, y, z) {
-    document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-    document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-    document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
-}
-
-updateGyroUI(alpha, beta, gamma) {
-    document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-    document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
-    document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
-}
-
-
-// Initialize the app when DOM is loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.app = new MotionRecorderApp();
-    });
-} else {
-    window.app = new MotionRecorderApp();
-}
-
-// Register service worker for PWA functionality
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then((registration) => {
-                console.log('ServiceWorker registration successful:', registration.scope);
-                
-                // Check for updates periodically
-                setInterval(() => {
-                    registration.update();
-                }, 3600000); // Check every hour
-            })
-            .catch((error) => {
-                console.error('ServiceWorker registration failed:', error);
-            });
-    });
-} else {
-    console.log('Service workers are not supported');
-}
+            this.
