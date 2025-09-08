@@ -33,10 +33,7 @@ if (typeof window !== 'undefined' && typeof nanoid === 'undefined') {
 // Rest of app.js remains the same...
 // [Include the rest of your app.js code here, but replace the initUserId method with this:]
 
-// NanoID fallback if CDN fails
-if (typeof nanoid === 'undefined') {
-    window.nanoid = () => Math.random().toString(36).substring(2, 12);
-}
+
 
 
 
@@ -148,18 +145,7 @@ class MotionRecorderApp {
         }
     }
     
-    async initUserId() {
-        // Check for existing user ID in cookie
-        const cookies = document.cookie.split(';');
-        let userId = null;
-        
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'userId') {
-                userId = value;
-                break;
-            }
-        }
+   
         
         if (!userId) {
             // Generate new 10 character unique ID using nanoid
