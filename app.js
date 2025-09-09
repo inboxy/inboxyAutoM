@@ -1,265 +1,61 @@
 // ============================================
-// app.js - FIXED VERSION - Console Errors Resolved
+// app.js - Main Application (Refactored)
 // ============================================
 
-// Robust ID generation fallback (no dependency on nanoid)
-function generateId(length = 10) {
-    // First try crypto API (most secure)
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        const array = new Uint8Array(length);
-        crypto.getRandomValues(array);
-        let result = '';
-        for (let i = 0; i < length; i++) {
-            result += chars[array[i] % chars.length];
-        }
-        return result;
-    }
-    
-    // Fallback to Math.random
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-// Check if nanoid is available and working
-let nanoidAvailable = false;
-try {
-    if (typeof nanoid === 'function') {
-        // Test nanoid to make sure it works
-        const test = nanoid(5);
-        if (test && test.length === 5) {
-            nanoidAvailable = true;
-        }
-    }
-} catch (error) {
-    console.warn('Nanoid not available or has errors, using fallback:', error.message);
-}
-
-// Set up fallback if nanoid is not available
-if (!nanoidAvailable) {
-    if (typeof window !== 'undefined') {
-        window.nanoid = generateId;
-    }
-    // Also create global nanoid for compatibility
-    if (typeof globalThis !== 'undefined') {
-        globalThis.nanoid = generateId;
-    }
-}
-
-// Error boundary for better error handling
-class ErrorBoundary {
-    static handle(error, context) {
-        console.error(`Error in ${context}:`, error);
-        
-        // Show user-friendly notification
-        if (window.app && window.app.showNotification) {
-            window.app.showNotification(`An error occurred in ${context}. Please try again.`, 'error');
-        }
-        
-        // Report to monitoring service if configured
-        if (window.MotionRecorderConfig?.features?.errorReporting) {
-            this.reportError(error, context);
-        }
-    }
-    
-    static reportError(error, context) {
-        // Implement error reporting to your monitoring service
-        console.log('Error reported:', { 
-            error: error.message, 
-            context, 
-            timestamp: new Date().toISOString() 
-        });
-    }
-}
+import { ErrorBoundary } from './utils.js';
+import { UserManager } from './user-manager.js';
+import { DatabaseManager } from './database.js';
+import { SensorManager } from './sensors.js';
+import { WorkerManager } from './worker-manager.js';
+import { UIManager } from './ui-manager.js';
 
 class MotionRecorderApp {
     constructor() {
-        this.userId = null;
+        // Core managers
+        this.userManager = new UserManager();
+        this.databaseManager = new DatabaseManager();
+        this.sensorManager = new SensorManager(this.handleSensorData.bind(this));
+        this.workerManager = new WorkerManager(
+            this.saveRecordingData.bind(this),
+            this.updateStats.bind(this)
+        );
+        this.uiManager = new UIManager(this);
+        
+        // Recording state
         this.isRecording = false;
-        this.recordingData = [];
         this.startTime = null;
-        this.worker = null;
-        this.db = null;
         this.currentRecordingId = null;
-        this.watchId = null;
-        this.sensorRafId = null;
-        this.batchInterval = null;
-        this.performanceMonitor = null;
         this.batteryLevel = 1;
-        this.adaptiveSampleRate = 140; // Start with target rate
-        this.recordingTimeout = null;
-        this.cleanupMotion = null;
+        
+        // Performance monitoring
+        this.performanceMonitor = null;
         
         this.init();
     }
     
     async init() {
         try {
-            await this.initUserId();
-            await this.initIndexedDB();
-            this.initUI();
+            await this.userManager.init();
+            await this.databaseManager.init();
+            this.uiManager.init();
             this.initPerformanceMonitor();
-            await this.checkPermissions();
-            this.initWorker();
+            await this.sensorManager.checkPermissions();
+            this.workerManager.init();
             this.initBatteryMonitoring();
-            this.initNetworkMonitoring();
+            
+            this.uiManager.updateAppStatus('Ready');
+            this.uiManager.enableControls();
+            
         } catch (error) {
             ErrorBoundary.handle(error, 'App Initialization');
+            this.uiManager.updateAppStatus('Error');
+            this.uiManager.disableControls();
         }
-    }
-    
-    async initUserId() {
-        // Check for existing user ID in cookie
-        const cookies = document.cookie.split(';');
-        let userId = null;
-        
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'userId') {
-                userId = value;
-                break;
-            }
-        }
-        
-        if (!userId) {
-            // Generate new 10 character unique ID
-            // Use nanoid if available, otherwise use our fallback
-            if (nanoidAvailable && typeof nanoid === 'function') {
-                try {
-                    userId = nanoid(10);
-                } catch (error) {
-                    console.warn('Nanoid failed, using fallback:', error);
-                    userId = generateId(10);
-                }
-            } else {
-                userId = generateId(10);
-            }
-            
-            // Store in cookie (expires in 1 year)
-            const expires = new Date();
-            expires.setFullYear(expires.getFullYear() + 1);
-            
-            // Add Secure flag only if on HTTPS
-            const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-            document.cookie = `userId=${userId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
-        }
-        
-        this.userId = userId;
-        const userIdElement = document.getElementById('user-id');
-        if (userIdElement) {
-            userIdElement.textContent = userId;
-        }
-    }
-    
-    async initIndexedDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open('MotionRecorderDB', 2);
-            
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => {
-                this.db = request.result;
-                resolve();
-            };
-            
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                
-                // Create recordings store if it doesn't exist
-                if (!db.objectStoreNames.contains('recordings')) {
-                    const recordingStore = db.createObjectStore('recordings', {
-                        keyPath: 'id',
-                        autoIncrement: true
-                    });
-                    recordingStore.createIndex('timestamp', 'timestamp', { unique: false });
-                    recordingStore.createIndex('userId', 'userId', { unique: false });
-                }
-                
-                // Create data points store if it doesn't exist
-                if (!db.objectStoreNames.contains('dataPoints')) {
-                    const dataStore = db.createObjectStore('dataPoints', {
-                        keyPath: 'id',
-                        autoIncrement: true
-                    });
-                    dataStore.createIndex('recordingId', 'recordingId', { unique: false });
-                    dataStore.createIndex('timestamp', 'timestamp', { unique: false });
-                }
-                
-                // Create performance metrics store
-                if (!db.objectStoreNames.contains('performanceMetrics')) {
-                    const metricsStore = db.createObjectStore('performanceMetrics', {
-                        keyPath: 'id',
-                        autoIncrement: true
-                    });
-                    metricsStore.createIndex('recordingId', 'recordingId', { unique: false });
-                }
-            };
-        });
-    }
-    
-    initUI() {
-        document.getElementById('start-btn').addEventListener('click', () => this.startRecording());
-        document.getElementById('stop-btn').addEventListener('click', () => this.stopRecording());
-        document.getElementById('download-btn').addEventListener('click', () => this.downloadCSV());
-        document.getElementById('upload-btn').addEventListener('click', () => this.uploadJSON());
-        
-        // Add retry buttons for permissions
-        const retryButtons = document.querySelectorAll('.retry-permission');
-        retryButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const sensor = e.target.id.replace('-retry', '');
-                this.retryPermission(sensor);
-            });
-        });
     }
     
     initPerformanceMonitor() {
         if (window.performanceMonitor) {
             this.performanceMonitor = window.performanceMonitor;
-        }
-    }
-    
-    initWorker() {
-        try {
-            this.worker = new Worker('worker.js');
-            
-            this.worker.addEventListener('message', (e) => {
-                const { type, data } = e.data;
-                
-                switch(type) {
-                    case 'RECORDING_STARTED':
-                        console.log('Worker: Recording started');
-                        break;
-                        
-                    case 'RECORDING_STOPPED':
-                        this.saveRecordingData(data.data, data.stats);
-                        break;
-                        
-                    case 'CSV_GENERATED':
-                        this.downloadCSVFile(data);
-                        break;
-                        
-                    case 'STATS_UPDATE':
-                        this.updateStats(data);
-                        break;
-                        
-                    case 'WORKER_ERROR':
-                        ErrorBoundary.handle(new Error(data), 'Worker');
-                        break;
-                }
-            });
-            
-            this.worker.addEventListener('error', (error) => {
-                console.error('Worker error details:', error);
-                ErrorBoundary.handle(error, 'Worker');
-            });
-            
-        } catch (error) {
-            console.error('Failed to initialize worker:', error);
-            ErrorBoundary.handle(error, 'Worker Initialization');
         }
     }
     
@@ -271,13 +67,16 @@ class MotionRecorderApp {
                 
                 battery.addEventListener('levelchange', () => {
                     this.batteryLevel = battery.level;
-                    this.adjustSampleRateForBattery();
+                    this.sensorManager.adjustSampleRateForBattery(this.batteryLevel);
                 });
                 
                 // Check battery level periodically during recording
                 setInterval(() => {
                     if (this.isRecording && this.batteryLevel < 0.2) {
-                        this.showNotification('Low battery: Sample rate reduced to conserve power', 'warning');
+                        this.uiManager.showNotification(
+                            'Low battery: Sample rate reduced to conserve power', 
+                            'warning'
+                        );
                     }
                 }, 60000); // Check every minute
             } catch (error) {
@@ -286,409 +85,30 @@ class MotionRecorderApp {
         }
     }
     
-    adjustSampleRateForBattery() {
-        if (this.batteryLevel < 0.2) {
-            this.adaptiveSampleRate = 60;
-            console.log('Battery low, reducing sample rate to 60Hz');
-        } else if (this.batteryLevel < 0.5) {
-            this.adaptiveSampleRate = 100;
-        } else {
-            this.adaptiveSampleRate = window.MotionRecorderConfig?.sensors?.targetRate || 140;
-        }
-    }
-    
-    initNetworkMonitoring() {
-        // Monitor online/offline status
-        window.addEventListener('online', () => {
-            const statusEl = document.getElementById('online-status');
-            if (statusEl) {
-                statusEl.className = 'online-status online';
-                statusEl.textContent = 'Online';
+    handleSensorData(data) {
+        if (this.isRecording && this.workerManager.isAvailable()) {
+            if (Array.isArray(data)) {
+                this.workerManager.addDataBatch(data);
+            } else {
+                this.workerManager.addDataPoint(data);
             }
             
-            // Try to upload any pending data
-            this.uploadPendingData();
-        });
-        
-        window.addEventListener('offline', () => {
-            const statusEl = document.getElementById('online-status');
-            if (statusEl) {
-                statusEl.className = 'online-status offline';
-                statusEl.textContent = 'Offline';
-            }
-        });
-    }
-    
-    async checkPermissions() {
-        // Check GPS permission
-        if ('geolocation' in navigator) {
-            try {
-                await this.getCurrentPosition();
-                this.updatePermissionStatus('gps', 'granted');
-                this.startGPSTracking();
-            } catch (error) {
-                console.warn('GPS permission error:', error);
-                this.updatePermissionStatus('gps', 'denied');
-                const retryBtn = document.getElementById('gps-retry');
-                if (retryBtn) retryBtn.style.display = 'inline-block';
-            }
-        } else {
-            this.updatePermissionStatus('gps', 'unsupported');
-        }
-        
-        // Check motion sensors
-        if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
-            try {
-                const permission = await DeviceMotionEvent.requestPermission();
-                if (permission === 'granted') {
-                    this.updatePermissionStatus('accel', 'granted');
-                    this.updatePermissionStatus('gyro', 'granted');
-                    this.startMotionTracking();
-                } else {
-                    this.updatePermissionStatus('accel', 'denied');
-                    this.updatePermissionStatus('gyro', 'denied');
-                    document.getElementById('accel-retry').style.display = 'inline-block';
-                    document.getElementById('gyro-retry').style.display = 'inline-block';
-                }
-            } catch (error) {
-                this.updatePermissionStatus('accel', 'denied');
-                this.updatePermissionStatus('gyro', 'denied');
-            }
-        } else if ('DeviceMotionEvent' in window) {
-            // For non-iOS devices, test if we're getting data
-            this.testMotionSensors();
-        } else {
-            this.updatePermissionStatus('accel', 'unsupported');
-            this.updatePermissionStatus('gyro', 'unsupported');
-        }
-    }
-    
-    testMotionSensors() {
-        let hasData = false;
-        
-        const testHandler = (event) => {
-            if (event.accelerationIncludingGravity || event.rotationRate) {
-                hasData = true;
-                this.updatePermissionStatus('accel', 'granted');
-                this.updatePermissionStatus('gyro', 'granted');
-                window.removeEventListener('devicemotion', testHandler);
-                this.startMotionTracking();
-            }
-        };
-        
-        window.addEventListener('devicemotion', testHandler);
-        
-        // If no data after 2 seconds, assume denied
-        setTimeout(() => {
-            if (!hasData) {
-                window.removeEventListener('devicemotion', testHandler);
-                this.updatePermissionStatus('accel', 'denied');
-                this.updatePermissionStatus('gyro', 'denied');
-            }
-        }, 2000);
-    }
-    
-    async retryPermission(sensor) {
-        if (sensor === 'gps') {
-            try {
-                await this.getCurrentPosition();
-                this.updatePermissionStatus('gps', 'granted');
-                this.startGPSTracking();
-                document.getElementById('gps-retry').style.display = 'none';
-            } catch (error) {
-                this.showNotification('GPS permission denied. Please enable in browser settings.', 'error');
-            }
-        } else if (sensor === 'accel' || sensor === 'gyro') {
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceMotionEvent.requestPermission();
-                    if (permission === 'granted') {
-                        this.updatePermissionStatus('accel', 'granted');
-                        this.updatePermissionStatus('gyro', 'granted');
-                        this.startMotionTracking();
-                        document.getElementById('accel-retry').style.display = 'none';
-                        document.getElementById('gyro-retry').style.display = 'none';
-                    }
-                } catch (error) {
-                    this.showNotification('Motion sensor permission denied. Please enable in browser settings.', 'error');
-                }
+            // Performance monitoring
+            if (this.performanceMonitor && !Array.isArray(data)) {
+                this.performanceMonitor.addSample();
             }
         }
-    }
-    
-    updatePermissionStatus(sensor, status) {
-        const element = document.getElementById(`${sensor}-status`);
-        if (element) {
-            element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-            element.className = `permission-status status-${status}`;
-        }
-    }
-    
-    getCurrentPosition() {
-        return new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 15000, // Increased timeout to 15 seconds
-                maximumAge: 5000 // Allow cached position up to 5 seconds old
-            });
-        });
-    }
-    
-    startGPSTracking() {
-        const options = {
-            enableHighAccuracy: true,
-            timeout: 10000, // 10 second timeout for position updates
-            maximumAge: 2000 // Accept positions up to 2 seconds old
-        };
-        
-        this.watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = position.coords;
-                const timestamp = new Date(position.timestamp).toISOString();
-                
-                // Update UI
-                document.getElementById('gps-lat').textContent = latitude.toFixed(6);
-                document.getElementById('gps-lon').textContent = longitude.toFixed(6);
-                document.getElementById('gps-error').textContent = `${accuracy.toFixed(1)} m`;
-                document.getElementById('gps-alt').textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
-                
-                // Send to worker if recording
-                if (this.isRecording && this.worker) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_POINT',
-                        data: {
-                            recordingTimestamp: this.startTime,
-                            userId: this.userId,
-                            gpsTimestamp: timestamp,
-                            gpsLat: latitude,
-                            gpsLon: longitude,
-                            gpsError: accuracy,
-                            gpsAlt: altitude,
-                            gpsAltAccuracy: altitudeAccuracy,
-                            gpsHeading: heading,
-                            gpsSpeed: speed,
-                            timestamp: Date.now()
-                        }
-                    });
-                }
-            },
-            (error) => {
-                console.warn('GPS error:', error.message);
-                // Don't change permission status for timeout errors
-                if (error.code !== 3) { // TIMEOUT = 3
-                    this.updatePermissionStatus('gps', 'denied');
-                }
-            },
-            options
-        );
-    }
-    
-    startMotionTracking() {
-        // Use passive listeners for better performance
-        const options = { passive: true };
-        
-        // Store latest sensor data - no processing in event handler
-        let latestMotionEvent = null;
-        let lastProcessTime = 0;
-        
-        // Minimal event handler - just store data
-        const motionHandler = (event) => {
-            latestMotionEvent = {
-                acceleration: event.accelerationIncludingGravity,
-                rotationRate: event.rotationRate,
-                timestamp: event.timeStamp || performance.now()
-            };
-        };
-        
-        window.addEventListener('devicemotion', motionHandler, options);
-        
-        // High-frequency processing loop
-        const targetInterval = 1000 / this.adaptiveSampleRate; // ~7.14ms for 140Hz
-        let accelBatch = [];
-        let gyroBatch = [];
-        let lastUIUpdate = 0;
-        
-        const processMotionData = (currentTime) => {
-            if (!latestMotionEvent) {
-                this.sensorRafId = requestAnimationFrame(processMotionData);
-                return;
-            }
-            
-            const deltaTime = currentTime - lastProcessTime;
-            
-            // Only process if enough time has passed (rate limiting)
-            if (deltaTime >= targetInterval) {
-                const now = Date.now();
-                const timestamp = new Date().toISOString();
-                
-                // Process acceleration
-                if (latestMotionEvent.acceleration) {
-                    const { x, y, z } = latestMotionEvent.acceleration;
-                    
-                    if (this.validateSensorData('accel', { x, y, z })) {
-                        // Throttled UI updates (10Hz)
-                        if (currentTime - lastUIUpdate > 100) {
-                            this.updateAccelUI(x, y, z);
-                            lastUIUpdate = currentTime;
-                        }
-                        
-                        if (this.isRecording) {
-                            accelBatch.push({
-                                recordingTimestamp: this.startTime,
-                                userId: this.userId,
-                                accelTimestamp: timestamp,
-                                accelX: x,
-                                accelY: y,
-                                accelZ: z,
-                                timestamp: now
-                            });
-                            
-                            // Performance monitoring
-                            if (this.performanceMonitor) {
-                                this.performanceMonitor.addSample();
-                            }
-                        }
-                    }
-                }
-                
-                // Process gyroscope
-                if (latestMotionEvent.rotationRate) {
-                    const { alpha, beta, gamma } = latestMotionEvent.rotationRate;
-                    
-                    if (this.validateSensorData('gyro', { alpha, beta, gamma })) {
-                        // Throttled UI updates
-                        if (currentTime - lastUIUpdate > 100) {
-                            this.updateGyroUI(alpha, beta, gamma);
-                        }
-                        
-                        if (this.isRecording) {
-                            gyroBatch.push({
-                                recordingTimestamp: this.startTime,
-                                userId: this.userId,
-                                gyroTimestamp: timestamp,
-                                gyroAlpha: alpha,
-                                gyroBeta: beta,
-                                gyroGamma: gamma,
-                                timestamp: now
-                            });
-                        }
-                    }
-                }
-                
-                // Send batches when they reach target size
-                if (this.worker && accelBatch.length >= 10) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...accelBatch]
-                    });
-                    accelBatch = [];
-                }
-                
-                if (this.worker && gyroBatch.length >= 10) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...gyroBatch]
-                    });
-                    gyroBatch = [];
-                }
-                
-                lastProcessTime = currentTime;
-            }
-            
-            this.sensorRafId = requestAnimationFrame(processMotionData);
-        };
-        
-        // Start processing loop
-        this.sensorRafId = requestAnimationFrame(processMotionData);
-        
-        // Periodic batch flush for remaining data
-        this.batchInterval = setInterval(() => {
-            if (this.worker) {
-                if (accelBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...accelBatch]
-                    });
-                    accelBatch = [];
-                }
-                if (gyroBatch.length > 0) {
-                    this.worker.postMessage({
-                        type: 'ADD_DATA_BATCH',
-                        data: [...gyroBatch]
-                    });
-                    gyroBatch = [];
-                }
-            }
-        }, 100);
-        
-        // Store cleanup function
-        this.cleanupMotion = () => {
-            window.removeEventListener('devicemotion', motionHandler);
-            if (this.sensorRafId) {
-                cancelAnimationFrame(this.sensorRafId);
-            }
-            if (this.batchInterval) {
-                clearInterval(this.batchInterval);
-            }
-        };
-    }
-    
-    // Separate UI update methods for better performance
-    updateAccelUI(x, y, z) {
-        document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-        document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-        document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
-    }
-    
-    updateGyroUI(alpha, beta, gamma) {
-        document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-        document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
-        document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
-    }
-    
-    stopMotionTracking() {
-        if (this.cleanupMotion) {
-            this.cleanupMotion();
-            this.cleanupMotion = null;
-        }
-    }
-    
-    validateSensorData(type, data) {
-        const config = window.MotionRecorderConfig?.sensors;
-        if (!config?.dataValidation) return true;
-        
-        // Add NaN and Infinity checks
-        const isValidNumber = (val) => typeof val === 'number' && isFinite(val);
-        
-        if (type === 'accel') {
-            const maxAccel = 50; // m/s²
-            if (!Object.values(data).every(isValidNumber)) return false;
-            if (Math.abs(data.x) > maxAccel || 
-                Math.abs(data.y) > maxAccel || 
-                Math.abs(data.z) > maxAccel) {
-                console.warn('Acceleration data out of range', data);
-                return false;
-            }
-        } else if (type === 'gyro') {
-            const maxGyro = 2000; // degrees/s
-            if (!Object.values(data).every(isValidNumber)) return false;
-            if (Math.abs(data.alpha) > maxGyro || 
-                Math.abs(data.beta) > maxGyro || 
-                Math.abs(data.gamma) > maxGyro) {
-                console.warn('Gyroscope data out of range', data);
-                return false;
-            }
-        }
-        
-        return true;
     }
     
     async startRecording() {
         try {
             // Check if we have necessary permissions
-            const hasPermissions = this.checkRecordingPermissions();
+            const hasPermissions = this.sensorManager.checkRecordingPermissions();
             if (!hasPermissions) {
-                this.showNotification('Please grant sensor permissions before recording', 'warning');
+                this.uiManager.showNotification(
+                    'Please grant sensor permissions before recording', 
+                    'warning'
+                );
                 return;
             }
             
@@ -696,16 +116,10 @@ class MotionRecorderApp {
             this.startTime = new Date().toISOString();
             
             // Adjust sample rate based on battery
-            this.adjustSampleRateForBattery();
+            this.sensorManager.adjustSampleRateForBattery(this.batteryLevel);
             
             // Update UI
-            document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('stop-btn').style.display = 'inline-flex';
-            document.getElementById('post-recording-controls').classList.remove('visible');
-            
-            const statusIndicator = document.getElementById('status-indicator');
-            statusIndicator.className = 'status-indicator status-recording pulse';
-            statusIndicator.innerHTML = '<span>● Recording...</span>';
+            this.uiManager.showRecordingState();
             
             // Start performance monitoring
             if (this.performanceMonitor) {
@@ -713,48 +127,31 @@ class MotionRecorderApp {
             }
             
             // Start worker recording
-            if (this.worker) {
-                this.worker.postMessage({ type: 'START_RECORDING' });
-            }
+            this.workerManager.startRecording();
+            
+            // Start sensor tracking
+            this.sensorManager.startTracking(this.startTime, this.userManager.getUserId());
             
             // Create recording entry in IndexedDB
-            const transaction = this.db.transaction(['recordings'], 'readwrite');
-            const store = transaction.objectStore('recordings');
-            
             const recording = {
-                userId: this.userId,
+                userId: this.userManager.getUserId(),
                 timestamp: this.startTime,
                 status: 'recording',
-                sampleRate: this.adaptiveSampleRate,
+                sampleRate: this.sensorManager.adaptiveSampleRate,
                 batteryLevel: this.batteryLevel
             };
             
-            const request = store.add(recording);
-            request.onsuccess = () => {
-                this.currentRecordingId = request.result;
-            };
+            this.currentRecordingId = await this.databaseManager.saveRecording(recording);
             
             // Set maximum recording duration
             const maxDuration = window.MotionRecorderConfig?.sensors?.maxRecordingDuration || 3600000;
-            this.recordingTimeout = setTimeout(() => {
-                this.stopRecording();
-                this.showNotification('Maximum recording duration reached', 'info');
-            }, maxDuration);
+            this.uiManager.setMaxRecordingDuration(maxDuration);
             
         } catch (error) {
             ErrorBoundary.handle(error, 'Start Recording');
             this.isRecording = false;
+            this.uiManager.showReadyState();
         }
-    }
-    
-    checkRecordingPermissions() {
-        const gpsStatus = document.getElementById('gps-status')?.textContent.toLowerCase();
-        const accelStatus = document.getElementById('accel-status')?.textContent.toLowerCase();
-        const gyroStatus = document.getElementById('gyro-status')?.textContent.toLowerCase();
-        
-        return (gpsStatus === 'granted' || gpsStatus === 'unsupported') &&
-               (accelStatus === 'granted' || accelStatus === 'unsupported') &&
-               (gyroStatus === 'granted' || gyroStatus === 'unsupported');
     }
     
     async stopRecording() {
@@ -762,29 +159,21 @@ class MotionRecorderApp {
             this.isRecording = false;
             
             // Clear recording timeout
-            if (this.recordingTimeout) {
-                clearTimeout(this.recordingTimeout);
-                this.recordingTimeout = null;
-            }
+            this.uiManager.clearRecordingTimeout();
             
             // Stop performance monitoring
             if (this.performanceMonitor) {
                 this.performanceMonitor.stop();
             }
             
-            // Update UI
-            document.getElementById('start-btn').style.display = 'inline-flex';
-            document.getElementById('stop-btn').style.display = 'none';
-            document.getElementById('post-recording-controls').classList.add('visible');
+            // Stop sensor tracking
+            this.sensorManager.stopTracking();
             
-            const statusIndicator = document.getElementById('status-indicator');
-            statusIndicator.className = 'status-indicator status-idle';
-            statusIndicator.innerHTML = '<span>Recording completed</span>';
+            // Update UI
+            this.uiManager.showIdleState();
             
             // Stop worker recording
-            if (this.worker) {
-                this.worker.postMessage({ type: 'STOP_RECORDING' });
-            }
+            this.workerManager.stopRecording();
             
         } catch (error) {
             ErrorBoundary.handle(error, 'Stop Recording');
@@ -796,23 +185,16 @@ class MotionRecorderApp {
             if (!this.currentRecordingId) return;
             
             // Update recording status
-            const transaction = this.db.transaction(['recordings', 'performanceMetrics'], 'readwrite');
-            const recordingStore = transaction.objectStore('recordings');
-            const metricsStore = transaction.objectStore('performanceMetrics');
-            
-            const getRequest = recordingStore.get(this.currentRecordingId);
-            getRequest.onsuccess = () => {
-                const recording = getRequest.result;
-                recording.status = 'completed';
-                recording.endTime = new Date().toISOString();
-                recording.dataPointCount = data.length;
-                recording.averageHz = stats?.averageHz || 0;
-                recordingStore.put(recording);
-            };
+            await this.databaseManager.updateRecording(this.currentRecordingId, {
+                status: 'completed',
+                endTime: new Date().toISOString(),
+                dataPointCount: data.length,
+                averageHz: stats?.averageHz || 0
+            });
             
             // Save performance metrics
             if (stats) {
-                metricsStore.add({
+                await this.databaseManager.savePerformanceMetrics({
                     recordingId: this.currentRecordingId,
                     totalPoints: stats.totalPoints,
                     averageHz: stats.averageHz,
@@ -821,4 +203,136 @@ class MotionRecorderApp {
             }
             
             // Save data points in chunks to avoid memory issues
-            const CHUNK_SIZE = 1000;
+            await this.databaseManager.saveDataPoints(data, this.currentRecordingId);
+            
+            console.log('Recording saved successfully:', {
+                recordingId: this.currentRecordingId,
+                dataPoints: data.length,
+                averageHz: stats?.averageHz
+            });
+            
+            this.uiManager.showNotification(
+                `Recording saved: ${data.length} data points at ${(stats?.averageHz || 0).toFixed(1)} Hz`,
+                'success'
+            );
+            
+        } catch (error) {
+            ErrorBoundary.handle(error, 'Save Recording Data');
+        }
+    }
+    
+    updateStats(stats) {
+        this.uiManager.updateRecordingStats(stats);
+    }
+    
+    async downloadCSV() {
+        try {
+            if (!this.currentRecordingId) {
+                this.uiManager.showNotification('No recording to download', 'warning');
+                return;
+            }
+            
+            this.uiManager.showLoadingState('Generating CSV...');
+            
+            // Get data from database
+            const dataPoints = await this.databaseManager.getDataPoints(this.currentRecordingId);
+            
+            if (dataPoints.length === 0) {
+                this.uiManager.showNotification('No data points to export', 'warning');
+                this.uiManager.hideLoadingState();
+                return;
+            }
+            
+            // Generate CSV using worker
+            this.workerManager.generateCSV(dataPoints);
+            
+            this.uiManager.hideLoadingState();
+            
+        } catch (error) {
+            this.uiManager.hideLoadingState();
+            ErrorBoundary.handle(error, 'Download CSV');
+        }
+    }
+    
+    async uploadJSON() {
+        try {
+            if (!this.currentRecordingId) {
+                this.uiManager.showNotification('No recording to upload', 'warning');
+                return;
+            }
+            
+            const apiEndpoint = window.MotionRecorderConfig?.api?.endpoint;
+            if (!apiEndpoint || apiEndpoint === 'https://your-api-endpoint.com/api/recordings') {
+                this.uiManager.showNotification('API endpoint not configured', 'error');
+                return;
+            }
+            
+            this.uiManager.showLoadingState('Uploading data...');
+            
+            // Get recording and data from database
+            const recordings = await this.databaseManager.getRecordings(this.userManager.getUserId());
+            const recording = recordings.find(r => r.id === this.currentRecordingId);
+            const dataPoints = await this.databaseManager.getDataPoints(this.currentRecordingId);
+            
+            const payload = {
+                recording: recording,
+                dataPoints: dataPoints,
+                metadata: {
+                    version: '1.0.0',
+                    uploadTime: new Date().toISOString(),
+                    userAgent: navigator.userAgent
+                }
+            };
+            
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (response.ok) {
+                this.uiManager.showNotification('Data uploaded successfully', 'success');
+            } else {
+                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+            }
+            
+            this.uiManager.hideLoadingState();
+            
+        } catch (error) {
+            this.uiManager.hideLoadingState();
+            ErrorBoundary.handle(error, 'Upload JSON');
+            this.uiManager.showNotification('Upload failed. Data saved locally.', 'error');
+        }
+    }
+    
+    async uploadPendingData() {
+        try {
+            // This would be called when connection is restored
+            console.log('Checking for pending data to upload...');
+            // Implementation for background sync would go here
+        } catch (error) {
+            console.warn('Failed to upload pending data:', error);
+        }
+    }
+    
+    // Expose methods for UI callbacks
+    showNotification(message, type, duration) {
+        this.uiManager.showNotification(message, type, duration);
+    }
+}
+
+// Initialize the application when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        window.app = new MotionRecorderApp();
+        console.log('Motion Recorder App initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize Motion Recorder App:', error);
+        ErrorBoundary.handle(error, 'App Initialization');
+    }
+});
+
+// Export for global access if needed
+window.MotionRecorderApp = MotionRecorderApp;
