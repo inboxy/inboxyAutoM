@@ -1,5 +1,5 @@
 // ============================================
-// sensors.js - Sensor Management and Data Collection - FIXED
+// sensors.js - Sensor Management and Data Collection - COMPLETE FIX
 // ============================================
 
 import { ErrorBoundary, validateSensorData } from './utils.js';
@@ -13,6 +13,15 @@ export class SensorManager {
         this.cleanupMotion = null;
         this.adaptiveSampleRate = 140;
         this.isTracking = false;
+        
+        // Start tracking immediately for UI display (not recording)
+        this.startUITracking();
+    }
+    
+    // Start tracking for UI display only (before recording starts)
+    startUITracking() {
+        this.startGPSForUI();
+        this.startMotionForUI();
     }
     
     async checkPermissions() {
@@ -21,6 +30,8 @@ export class SensorManager {
             try {
                 await this.getCurrentPosition();
                 this.updatePermissionStatus('gps', 'granted');
+                // Start GPS tracking for UI immediately after permission granted
+                this.startGPSForUI();
             } catch (error) {
                 console.warn('GPS permission error:', error);
                 this.updatePermissionStatus('gps', 'denied');
@@ -38,6 +49,8 @@ export class SensorManager {
                 if (permission === 'granted') {
                     this.updatePermissionStatus('accel', 'granted');
                     this.updatePermissionStatus('gyro', 'granted');
+                    // Start motion tracking for UI immediately after permission granted
+                    this.startMotionForUI();
                 } else {
                     this.updatePermissionStatus('accel', 'denied');
                     this.updatePermissionStatus('gyro', 'denied');
@@ -70,6 +83,8 @@ export class SensorManager {
                 this.updatePermissionStatus('accel', 'granted');
                 this.updatePermissionStatus('gyro', 'granted');
                 window.removeEventListener('devicemotion', testHandler);
+                // Start motion tracking for UI after detecting data
+                this.startMotionForUI();
             }
         };
         
@@ -92,6 +107,8 @@ export class SensorManager {
                 this.updatePermissionStatus('gps', 'granted');
                 const retryBtn = document.getElementById('gps-retry');
                 if (retryBtn) retryBtn.style.display = 'none';
+                // Restart GPS tracking for UI
+                this.startGPSForUI();
             } catch (error) {
                 if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
                     window.app.showNotification('GPS permission denied. Please enable in browser settings.', 'error');
@@ -108,6 +125,8 @@ export class SensorManager {
                         const gyroRetry = document.getElementById('gyro-retry');
                         if (accelRetry) accelRetry.style.display = 'none';
                         if (gyroRetry) gyroRetry.style.display = 'none';
+                        // Restart motion tracking for UI
+                        this.startMotionForUI();
                     }
                 } catch (error) {
                     if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
@@ -142,20 +161,14 @@ export class SensorManager {
         });
     }
     
-    startTracking(startTime, userId) {
-        this.isTracking = true;
-        this.startGPSTracking(startTime, userId);
-        this.startMotionTracking(startTime, userId);
-    }
-    
-    stopTracking() {
-        this.isTracking = false;
-        this.stopGPSTracking();
-        this.stopMotionTracking();
-    }
-    
-    startGPSTracking(startTime, userId) {
+    // Start GPS tracking for UI display (always active)
+    startGPSForUI() {
         if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+        
+        // Clear existing watch if any
+        if (this.watchId) {
+            navigator.geolocation.clearWatch(this.watchId);
+        }
         
         const options = {
             enableHighAccuracy: true,
@@ -168,14 +181,16 @@ export class SensorManager {
                 const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = position.coords;
                 const timestamp = new Date(position.timestamp).toISOString();
                 
-                // Update UI
+                console.log('GPS data received:', { latitude, longitude, accuracy });
+                
+                // Always update UI
                 this.updateGPSUI(latitude, longitude, accuracy, altitude);
                 
-                // Send data if tracking
+                // Send data if recording (tracking mode)
                 if (this.isTracking && this.onDataCallback) {
                     this.onDataCallback({
-                        recordingTimestamp: startTime,
-                        userId: userId,
+                        recordingTimestamp: this.recordingStartTime,
+                        userId: this.recordingUserId,
                         gpsTimestamp: timestamp,
                         gpsLat: latitude,
                         gpsLon: longitude,
@@ -191,22 +206,21 @@ export class SensorManager {
             (error) => {
                 console.warn('GPS error:', error.message);
                 if (error.code !== 3) { // TIMEOUT = 3
-                    this.updatePermissionStatus('gps', 'denied');
+                    this.updatePermissionStatus('gps', 'error');
                 }
             },
             options
         );
     }
     
-    stopGPSTracking() {
-        if (this.watchId && typeof navigator !== 'undefined' && navigator.geolocation) {
-            navigator.geolocation.clearWatch(this.watchId);
-            this.watchId = null;
-        }
-    }
-    
-    startMotionTracking(startTime, userId) {
+    // Start motion tracking for UI display (always active)
+    startMotionForUI() {
         if (typeof window === 'undefined') return;
+        
+        // Clean up existing motion tracking
+        if (this.cleanupMotion) {
+            this.cleanupMotion();
+        }
         
         // Use passive listeners for better performance
         const options = { passive: true };
@@ -214,6 +228,7 @@ export class SensorManager {
         // Store latest sensor data
         let latestMotionEvent = null;
         let lastProcessTime = 0;
+        let lastUIUpdate = 0;
         
         // Minimal event handler - just store data
         const motionHandler = (event) => {
@@ -230,7 +245,6 @@ export class SensorManager {
         const targetInterval = 1000 / this.adaptiveSampleRate;
         let accelBatch = [];
         let gyroBatch = [];
-        let lastUIUpdate = 0;
         
         const processMotionData = (currentTime) => {
             if (!latestMotionEvent) {
@@ -249,17 +263,20 @@ export class SensorManager {
                 if (latestMotionEvent.acceleration) {
                     const { x, y, z } = latestMotionEvent.acceleration;
                     
+                    console.log('Accel data received:', { x, y, z });
+                    
                     if (validateSensorData('accel', { x, y, z })) {
-                        // Throttled UI updates (10Hz)
+                        // Throttled UI updates (10Hz) - Always update UI
                         if (currentTime - lastUIUpdate > 100) {
                             this.updateAccelUI(x, y, z);
                             lastUIUpdate = currentTime;
                         }
                         
+                        // Send data if recording (tracking mode)
                         if (this.isTracking) {
                             accelBatch.push({
-                                recordingTimestamp: startTime,
-                                userId: userId,
+                                recordingTimestamp: this.recordingStartTime,
+                                userId: this.recordingUserId,
                                 accelTimestamp: timestamp,
                                 accelX: x,
                                 accelY: y,
@@ -274,16 +291,19 @@ export class SensorManager {
                 if (latestMotionEvent.rotationRate) {
                     const { alpha, beta, gamma } = latestMotionEvent.rotationRate;
                     
+                    console.log('Gyro data received:', { alpha, beta, gamma });
+                    
                     if (validateSensorData('gyro', { alpha, beta, gamma })) {
-                        // Throttled UI updates
+                        // Throttled UI updates - Always update UI
                         if (currentTime - lastUIUpdate > 100) {
                             this.updateGyroUI(alpha, beta, gamma);
                         }
                         
+                        // Send data if recording (tracking mode)
                         if (this.isTracking) {
                             gyroBatch.push({
-                                recordingTimestamp: startTime,
-                                userId: userId,
+                                recordingTimestamp: this.recordingStartTime,
+                                userId: this.recordingUserId,
                                 gyroTimestamp: timestamp,
                                 gyroAlpha: alpha,
                                 gyroBeta: beta,
@@ -294,13 +314,13 @@ export class SensorManager {
                     }
                 }
                 
-                // Send batches when they reach target size
-                if (this.onDataCallback && accelBatch.length >= 10) {
+                // Send batches when they reach target size (only when recording)
+                if (this.isTracking && this.onDataCallback && accelBatch.length >= 10) {
                     this.onDataCallback(accelBatch);
                     accelBatch = [];
                 }
                 
-                if (this.onDataCallback && gyroBatch.length >= 10) {
+                if (this.isTracking && this.onDataCallback && gyroBatch.length >= 10) {
                     this.onDataCallback(gyroBatch);
                     gyroBatch = [];
                 }
@@ -314,9 +334,9 @@ export class SensorManager {
         // Start processing loop
         this.sensorRafId = requestAnimationFrame(processMotionData);
         
-        // Periodic batch flush for remaining data
+        // Periodic batch flush for remaining data (only when recording)
         this.batchInterval = setInterval(() => {
-            if (this.onDataCallback) {
+            if (this.isTracking && this.onDataCallback) {
                 if (accelBatch.length > 0) {
                     this.onDataCallback(accelBatch);
                     accelBatch = [];
@@ -333,56 +353,104 @@ export class SensorManager {
             window.removeEventListener('devicemotion', motionHandler);
             if (this.sensorRafId) {
                 cancelAnimationFrame(this.sensorRafId);
+                this.sensorRafId = null;
             }
             if (this.batchInterval) {
                 clearInterval(this.batchInterval);
+                this.batchInterval = null;
             }
         };
     }
     
+    startTracking(startTime, userId) {
+        this.isTracking = true;
+        this.recordingStartTime = startTime;
+        this.recordingUserId = userId;
+        
+        console.log('Started recording mode - sensors will now save data');
+        
+        // Sensors are already running for UI, just enable data collection
+        // No need to restart - just set the recording flag and parameters
+    }
+    
+    stopTracking() {
+        this.isTracking = false;
+        this.recordingStartTime = null;
+        this.recordingUserId = null;
+        
+        console.log('Stopped recording mode - sensors continue for UI display only');
+        
+        // Don't stop sensors - keep them running for UI display
+        // Just disable data collection for recording
+    }
+    
+    // Legacy methods for backward compatibility - now just aliases
+    startGPSTracking(startTime, userId) {
+        this.startTracking(startTime, userId);
+    }
+    
+    stopGPSTracking() {
+        // Don't actually stop GPS - it should continue for UI
+        // This is handled in stopTracking()
+    }
+    
+    startMotionTracking(startTime, userId) {
+        this.startTracking(startTime, userId);
+    }
+    
     stopMotionTracking() {
-        if (this.cleanupMotion) {
-            this.cleanupMotion();
-            this.cleanupMotion = null;
-        }
+        // Don't actually stop motion sensors - they should continue for UI
+        // This is handled in stopTracking()
     }
     
     updateGPSUI(lat, lon, accuracy, altitude) {
         if (typeof document === 'undefined') return;
         
-        const latEl = document.getElementById('gps-lat');
-        const lonEl = document.getElementById('gps-lon');
-        const errorEl = document.getElementById('gps-error');
-        const altEl = document.getElementById('gps-alt');
-        
-        if (latEl) latEl.textContent = lat.toFixed(6);
-        if (lonEl) lonEl.textContent = lon.toFixed(6);
-        if (errorEl) errorEl.textContent = `${accuracy.toFixed(1)} m`;
-        if (altEl) altEl.textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
+        try {
+            const latEl = document.getElementById('gps-lat');
+            const lonEl = document.getElementById('gps-lon');
+            const errorEl = document.getElementById('gps-error');
+            const altEl = document.getElementById('gps-alt');
+            
+            if (latEl) latEl.textContent = lat.toFixed(6);
+            if (lonEl) lonEl.textContent = lon.toFixed(6);
+            if (errorEl) errorEl.textContent = `${accuracy.toFixed(1)} m`;
+            if (altEl) altEl.textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
+        } catch (error) {
+            console.warn('Error updating GPS UI:', error);
+        }
     }
     
     updateAccelUI(x, y, z) {
         if (typeof document === 'undefined') return;
         
-        const xEl = document.getElementById('accel-x');
-        const yEl = document.getElementById('accel-y');
-        const zEl = document.getElementById('accel-z');
-        
-        if (xEl) xEl.textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-        if (yEl) yEl.textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-        if (zEl) zEl.textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+        try {
+            const xEl = document.getElementById('accel-x');
+            const yEl = document.getElementById('accel-y');
+            const zEl = document.getElementById('accel-z');
+            
+            if (xEl) xEl.textContent = (x !== null && x !== undefined) ? `${x.toFixed(2)} m/s²` : '-- m/s²';
+            if (yEl) yEl.textContent = (y !== null && y !== undefined) ? `${y.toFixed(2)} m/s²` : '-- m/s²';
+            if (zEl) zEl.textContent = (z !== null && z !== undefined) ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+        } catch (error) {
+            console.warn('Error updating accelerometer UI:', error);
+        }
     }
     
     updateGyroUI(alpha, beta, gamma) {
         if (typeof document === 'undefined') return;
         
-        const alphaEl = document.getElementById('gyro-alpha');
-        const betaEl = document.getElementById('gyro-beta');
-        const gammaEl = document.getElementById('gyro-gamma');
-        
-        if (alphaEl) alphaEl.textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-        if (betaEl) betaEl.textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
-        if (gammaEl) gammaEl.textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+        try {
+            const alphaEl = document.getElementById('gyro-alpha');
+            const betaEl = document.getElementById('gyro-beta');
+            const gammaEl = document.getElementById('gyro-gamma');
+            
+            if (alphaEl) alphaEl.textContent = (alpha !== null && alpha !== undefined) ? `${alpha.toFixed(2)} °/s` : '-- °/s';
+            if (betaEl) betaEl.textContent = (beta !== null && beta !== undefined) ? `${beta.toFixed(2)} °/s` : '-- °/s';
+            if (gammaEl) gammaEl.textContent = (gamma !== null && gamma !== undefined) ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+        } catch (error) {
+            console.warn('Error updating gyroscope UI:', error);
+        }
     }
     
     adjustSampleRateForBattery(batteryLevel) {
@@ -407,5 +475,20 @@ export class SensorManager {
         return (gpsStatus === 'granted' || gpsStatus === 'unsupported') &&
                (accelStatus === 'granted' || accelStatus === 'unsupported') &&
                (gyroStatus === 'granted' || gyroStatus === 'unsupported');
+    }
+    
+    // Cleanup method to be called when app is destroyed
+    destroy() {
+        this.stopTracking();
+        
+        if (this.watchId && typeof navigator !== 'undefined' && navigator.geolocation) {
+            navigator.geolocation.clearWatch(this.watchId);
+            this.watchId = null;
+        }
+        
+        if (this.cleanupMotion) {
+            this.cleanupMotion();
+            this.cleanupMotion = null;
+        }
     }
 }
