@@ -1,6 +1,5 @@
-
 // ============================================
-// user-manager.js - User ID Management
+// user-manager.js - User ID Management - FIXED
 // ============================================
 
 import { generateId, getCookie, setCookie, setupNanoidFallback } from './utils.js';
@@ -25,9 +24,9 @@ export class UserManager {
         
         if (!userId) {
             // Generate new 10 character unique ID
-            if (this.nanoidAvailable && typeof nanoid === 'function') {
+            if (this.nanoidAvailable && typeof window !== 'undefined' && typeof window.nanoid === 'function') {
                 try {
-                    userId = nanoid(10);
+                    userId = window.nanoid(10);
                 } catch (error) {
                     console.warn('Nanoid failed, using fallback:', error);
                     userId = generateId(10);
@@ -45,9 +44,11 @@ export class UserManager {
     }
     
     updateUI() {
+        if (typeof document === 'undefined') return;
+        
         const userIdElement = document.getElementById('user-id');
         if (userIdElement) {
-            userIdElement.textContent = this.userId;
+            userIdElement.textContent = this.userId || 'N/A';
         }
     }
     
@@ -58,9 +59,9 @@ export class UserManager {
     regenerateUserId() {
         // Generate new user ID
         let newUserId;
-        if (this.nanoidAvailable && typeof nanoid === 'function') {
+        if (this.nanoidAvailable && typeof window !== 'undefined' && typeof window.nanoid === 'function') {
             try {
-                newUserId = nanoid(10);
+                newUserId = window.nanoid(10);
             } catch (error) {
                 console.warn('Nanoid failed, using fallback:', error);
                 newUserId = generateId(10);
@@ -85,3 +86,4 @@ export class UserManager {
         this.userId = null;
         this.updateUI();
     }
+}
