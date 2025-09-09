@@ -12,14 +12,6 @@
 </head>
 <body>
     <div class="container">
-        <!--
-        <header class="app-header">
-            <h1 class="app-title">Motion Recorder</h1>
-            <p class="app-subtitle">High-frequency sensor data recording</p>
-            <div id="online-status" class="online-status online" aria-live="polite">Online</div>
-        </header>
-        -->
-        
         <div class="card">
             <h2 class="card-title">Sensor Permissions</h2>
             <div class="permissions-grid">
@@ -55,190 +47,35 @@
                 </div>
             </div>
 
-<!-- Add this performance monitor section to your index.html -->
-<div class="card">
-    <h2 class="card-title">Performance Monitor</h2>
-    <div class="performance-stats">
-        <div class="stat-item">
-            <span class="stat-label">Sample Rate:</span>
-            <span id="sample-rate" class="stat-value">-- Hz</span>
-            <div class="rate-indicator">
-                <div id="rate-bar" class="rate-bar"></div>
+            <!-- Performance Monitor Section -->
+            <div class="card">
+                <h2 class="card-title">Performance Monitor</h2>
+                <div class="performance-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Sample Rate:</span>
+                        <span id="sample-rate" class="stat-value">-- Hz</span>
+                        <div class="rate-indicator">
+                            <div id="rate-bar" class="rate-bar"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Data Points:</span>
+                        <span id="data-count" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Buffer Size:</span>
+                        <span id="buffer-size" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Recording Time:</span>
+                        <span id="recording-time" class="stat-value">00:00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Memory Usage:</span>
+                        <span id="memory-usage" class="stat-value">-- MB</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Data Points:</span>
-            <span id="data-count" class="stat-value">0</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Buffer Size:</span>
-            <span id="buffer-size" class="stat-value">0</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Recording Time:</span>
-            <span id="recording-time" class="stat-value">00:00</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Memory Usage:</span>
-            <span id="memory-usage" class="stat-value">-- MB</span>
-        </div>
-    </div>
-</div>
-
-<style>
-.performance-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-    margin-top: 16px;
-}
-
-.stat-item {
-    background: var(--md-sys-color-surface);
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.stat-label {
-    display: block;
-    font-size: 12px;
-    color: var(--md-sys-color-on-surface-variant);
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.stat-value {
-    display: block;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--md-sys-color-primary);
-}
-
-.rate-indicator {
-    margin-top: 8px;
-    height: 4px;
-    background: var(--md-sys-color-surface-variant);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.rate-bar {
-    height: 100%;
-    background: linear-gradient(90deg, 
-        var(--md-sys-color-error) 0%, 
-        var(--md-sys-color-warning) 50%, 
-        var(--md-sys-color-success) 100%);
-    width: 0%;
-    transition: width 200ms ease;
-}
-
-/* Color coding for sample rates */
-.stat-value.rate-low { color: var(--md-sys-color-error); }
-.stat-value.rate-medium { color: var(--md-sys-color-warning); }
-.stat-value.rate-high { color: var(--md-sys-color-success); }
-</style>
-
-<script>
-// Performance monitoring code
-class PerformanceMonitor {
-    constructor() {
-        this.startTime = null;
-        this.dataCount = 0;
-        this.intervalId = null;
-        this.sampleTimes = [];
-        this.maxSamples = 100; // Keep last 100 samples for rate calculation
-    }
-    
-    start() {
-        this.startTime = Date.now();
-        this.dataCount = 0;
-        this.sampleTimes = [];
-        
-        // Update timer every second
-        this.intervalId = setInterval(() => {
-            this.updateRecordingTime();
-            this.updateMemoryUsage();
-        }, 1000);
-    }
-    
-    stop() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-    }
-    
-    addSample() {
-        const now = Date.now();
-        this.sampleTimes.push(now);
-        this.dataCount++;
-        
-        // Keep only recent samples
-        if (this.sampleTimes.length > this.maxSamples) {
-            this.sampleTimes.shift();
-        }
-        
-        // Calculate sample rate
-        if (this.sampleTimes.length > 1) {
-            const duration = (now - this.sampleTimes[0]) / 1000;
-            const rate = this.sampleTimes.length / duration;
-            this.updateSampleRate(rate);
-        }
-        
-        // Update data count
-        document.getElementById('data-count').textContent = this.dataCount.toLocaleString();
-    }
-    
-    updateSampleRate(rate) {
-        const element = document.getElementById('sample-rate');
-        const barElement = document.getElementById('rate-bar');
-        
-        element.textContent = `${rate.toFixed(1)} Hz`;
-        
-        // Color coding
-        if (rate < 50) {
-            element.className = 'stat-value rate-low';
-        } else if (rate < 100) {
-            element.className = 'stat-value rate-medium';
-        } else {
-            element.className = 'stat-value rate-high';
-        }
-        
-        // Update progress bar (max at 140Hz)
-        const percentage = Math.min((rate / 140) * 100, 100);
-        barElement.style.width = `${percentage}%`;
-    }
-    
-    updateRecordingTime() {
-        if (!this.startTime) return;
-        
-        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        
-        document.getElementById('recording-time').textContent = 
-            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    updateMemoryUsage() {
-        if (performance.memory) {
-            const mb = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
-            document.getElementById('memory-usage').textContent = `${mb} MB`;
-        }
-    }
-    
-    updateBufferSize(size) {
-        document.getElementById('buffer-size').textContent = size.toLocaleString();
-    }
-}
-
-// Initialize performance monitor
-window.performanceMonitor = new PerformanceMonitor();
-</script>
-            
             
             <div class="controls">
                 <div id="status-indicator" class="status-indicator status-idle" role="status" aria-live="polite">
@@ -354,11 +191,15 @@ window.performanceMonitor = new PerformanceMonitor();
                 </div>
                 <div class="info-item">
                     <span class="info-label">Version:</span>
-                    <span class="info-value">1.0.0</span>
+                    <span class="info-value">2.0.0</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Status:</span>
-                    <span id="app-status" class="info-value">Ready</span>
+                    <span id="app-status" class="info-value">Initializing...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Online Status:</span>
+                    <span id="online-status" class="info-value online">Online</span>
                 </div>
             </div>
         </div>
@@ -377,9 +218,161 @@ window.performanceMonitor = new PerformanceMonitor();
         <div class="loading-text">Processing...</div>
     </div>
     
-    <!-- Scripts -->
+    <!-- Performance Monitor Styles -->
+    <style>
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-item {
+            background: var(--md-sys-color-surface);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 12px;
+            color: var(--md-sys-color-on-surface-variant);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            display: block;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
+        }
+
+        .rate-indicator {
+            margin-top: 8px;
+            height: 4px;
+            background: var(--md-sys-color-surface-variant);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .rate-bar {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                var(--md-sys-color-error) 0%, 
+                var(--md-sys-color-warning) 50%, 
+                var(--md-sys-color-success) 100%);
+            width: 0%;
+            transition: width 200ms ease;
+        }
+
+        /* Color coding for sample rates */
+        .stat-value.rate-low { color: var(--md-sys-color-error); }
+        .stat-value.rate-medium { color: var(--md-sys-color-warning); }
+        .stat-value.rate-high { color: var(--md-sys-color-success); }
+    </style>
+
+    <!-- Performance Monitor Script -->
+    <script>
+        // Performance monitoring code
+        class PerformanceMonitor {
+            constructor() {
+                this.startTime = null;
+                this.dataCount = 0;
+                this.intervalId = null;
+                this.sampleTimes = [];
+                this.maxSamples = 100;
+            }
+            
+            start() {
+                this.startTime = Date.now();
+                this.dataCount = 0;
+                this.sampleTimes = [];
+                
+                this.intervalId = setInterval(() => {
+                    this.updateRecordingTime();
+                    this.updateMemoryUsage();
+                }, 1000);
+            }
+            
+            stop() {
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
+            }
+            
+            addSample() {
+                const now = Date.now();
+                this.sampleTimes.push(now);
+                this.dataCount++;
+                
+                if (this.sampleTimes.length > this.maxSamples) {
+                    this.sampleTimes.shift();
+                }
+                
+                if (this.sampleTimes.length > 1) {
+                    const duration = (now - this.sampleTimes[0]) / 1000;
+                    const rate = this.sampleTimes.length / duration;
+                    this.updateSampleRate(rate);
+                }
+                
+                document.getElementById('data-count').textContent = this.dataCount.toLocaleString();
+            }
+            
+            updateSampleRate(rate) {
+                const element = document.getElementById('sample-rate');
+                const barElement = document.getElementById('rate-bar');
+                
+                element.textContent = `${rate.toFixed(1)} Hz`;
+                
+                if (rate < 50) {
+                    element.className = 'stat-value rate-low';
+                } else if (rate < 100) {
+                    element.className = 'stat-value rate-medium';
+                } else {
+                    element.className = 'stat-value rate-high';
+                }
+                
+                const percentage = Math.min((rate / 140) * 100, 100);
+                barElement.style.width = `${percentage}%`;
+            }
+            
+            updateRecordingTime() {
+                if (!this.startTime) return;
+                
+                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                
+                document.getElementById('recording-time').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            updateMemoryUsage() {
+                if (performance.memory) {
+                    const mb = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+                    document.getElementById('memory-usage').textContent = `${mb} MB`;
+                }
+            }
+            
+            updateBufferSize(size) {
+                document.getElementById('buffer-size').textContent = size.toLocaleString();
+            }
+        }
+
+        window.performanceMonitor = new PerformanceMonitor();
+    </script>
+    
+    <!-- Configuration and Scripts -->
+    <script src="config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
-    <script src="app.js"></script>
+    
+    <!-- Main Application Module -->
+    <script type="module" src="app.js"></script>
     
     <!-- Feature detection and fallbacks -->
     <script>
@@ -389,7 +382,8 @@ window.performanceMonitor = new PerformanceMonitor();
             indexedDB: 'indexedDB' in window,
             geolocation: 'geolocation' in navigator,
             deviceMotion: 'DeviceMotionEvent' in window,
-            webWorkers: typeof Worker !== 'undefined'
+            webWorkers: typeof Worker !== 'undefined',
+            modules: 'noModule' in HTMLScriptElement.prototype
         };
         
         // Display feature support info for debugging
@@ -404,6 +398,16 @@ window.performanceMonitor = new PerformanceMonitor();
             
         if (missingFeatures.length > 0) {
             console.warn('Missing features:', missingFeatures);
+            
+            if (missingFeatures.includes('modules')) {
+                document.body.innerHTML = `
+                    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                        <h1>Browser Not Supported</h1>
+                        <p>This application requires a modern browser with ES6 module support.</p>
+                        <p>Please update your browser or try a different one.</p>
+                    </div>
+                `;
+            }
         }
     </script>
 </body>
