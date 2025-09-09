@@ -480,5 +480,244 @@
         // Initial status check
         document.addEventListener('DOMContentLoaded', updateOnlineStatus);
     </script>
+
+<!-- Add this script before closing </body> tag to fix the issues -->
+<script>
+// Quick fixes for storage info and button functionality
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait for app to initialize
+    setTimeout(async () => {
+        console.log('🔧 Applying quick fixes...');
+        
+        // Fix 1: Manual storage calculation
+        async function updateStorageInfo() {
+            try {
+                const storageEl = document.getElementById('storage-usage');
+                if (!storageEl) return;
+                
+                // Try modern storage API
+                if ('storage' in navigator && 'estimate' in navigator.storage) {
+                    const estimate = await navigator.storage.estimate();
+                    const usageMB = ((estimate.usage || 0) / 1048576).toFixed(1);
+                    const quotaMB = ((estimate.quota || 0) / 1048576).toFixed(0);
+                    const percent = estimate.quota ? ((estimate.usage || 0) / estimate.quota * 100).toFixed(1) : '0';
+                    
+                    storageEl.textContent = `${usageMB} MB / ${quotaMB} MB (${percent}%)`;
+                    console.log('✅ Storage info updated');
+                } else {
+                    storageEl.textContent = 'Storage API not available';
+                }
+            } catch (error) {
+                console.warn('Storage calculation failed:', error);
+                const storageEl = document.getElementById('storage-usage');
+                if (storageEl) storageEl.textContent = 'Error calculating';
+            }
+        }
+        
+        // Fix 2: Manual clear data functionality
+        function setupClearDataButton() {
+            const clearBtn = document.getElementById('clear-data-btn');
+            if (!clearBtn) return;
+            
+            clearBtn.addEventListener('click', async () => {
+                const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL stored data including recordings, data points, and your user ID. This cannot be undone.\n\nAre you sure you want to continue?');
+                
+                if (confirmed) {
+                    try {
+                        // Show loading
+                        clearBtn.textContent = 'Clearing...';
+                        clearBtn.disabled = true;
+                        
+                        // Clear IndexedDB
+                        if (window.app && window.app.databaseManager) {
+                            await window.app.databaseManager.clearAllData();
+                        }
+                        
+                        // Clear other storage
+                        if ('localStorage' in window) localStorage.clear();
+                        if ('sessionStorage' in window) sessionStorage.clear();
+                        
+                        // Clear cookies (regenerate user ID)
+                        if (window.app && window.app.userManager) {
+                            window.app.userManager.clearUserId();
+                            await window.app.userManager.init();
+                        }
+                        
+                        // Update UI
+                        await updateStorageInfo();
+                        
+                        clearBtn.textContent = 'CLEAR ALL DATA';
+                        clearBtn.disabled = false;
+                        
+                        alert('✅ All data cleared successfully! A new User ID has been generated.');
+                        console.log('✅ Clear data completed');
+                        
+                    } catch (error) {
+                        console.error('Clear data failed:', error);
+                        alert('❌ Failed to clear data: ' + error.message);
+                        clearBtn.textContent = 'CLEAR ALL DATA';
+                        clearBtn.disabled = false;
+                    }
+                }
+            });
+            
+            console.log('✅ Clear data button setup');
+        }
+        
+        // Fix 3: Manual export data functionality
+        function setupExportDataButton() {
+            const exportBtn = document.getElementById('export-data-btn');
+            if (!exportBtn) return;
+            
+            exportBtn.addEventListener('click', async () => {
+                try {
+                    exportBtn.textContent = 'Exporting...';
+                    exportBtn.disabled = true;
+                    
+                    if (!window.app || !window.app.databaseManager) {
+                        throw new Error('App not initialized');
+                    }
+                    
+                    // Get all recordings
+                    const recordings = await window.app.databaseManager.getRecordings();
+                    
+                    if (recordings.length === 0) {
+                        alert('No data to export. Record some data first.');
+                        exportBtn.textContent = 'EXPORT ALL DATA';
+                        exportBtn.disabled = false;
+                        return;
+                    }
+                    
+                    const exportData = {
+                        metadata: {
+                            exportDate: new Date().toISOString(),
+                            userId: window.app.userManager.getUserId(),
+                            version: '2.0.0',
+                            totalRecordings: recordings.length
+                        },
+                        recordings: []
+                    };
+                    
+                    // Get data points for each recording
+                    for (const recording of recordings) {
+                        const dataPoints = await window.app.databaseManager.getDataPoints(recording.id);
+                        exportData.recordings.push({
+                            ...recording,
+                            dataPoints: dataPoints
+                        });
+                    }
+                    
+                    // Create and download file
+                    const jsonContent = JSON.stringify(exportData, null, 2);
+                    const blob = new Blob([jsonContent], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `motion-recorder-export-${new Date().toISOString().slice(0, 10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    exportBtn.textContent = 'EXPORT ALL DATA';
+                    exportBtn.disabled = false;
+                    
+                    const totalDataPoints = exportData.recordings.reduce((sum, r) => sum + r.dataPoints.length, 0);
+                    alert(`✅ Exported ${recordings.length} recordings with ${totalDataPoints} data points`);
+                    console.log('✅ Export completed');
+                    
+                } catch (error) {
+                    console.error('Export failed:', error);
+                    alert('❌ Export failed: ' + error.message);
+                    exportBtn.textContent = 'EXPORT ALL DATA';
+                    exportBtn.disabled = false;
+                }
+            });
+            
+            console.log('✅ Export data button setup');
+        }
+        
+        // Fix 4: Create some test data for testing export
+        async function createTestDataIfNeeded() {
+            try {
+                if (!window.app || !window.app.databaseManager) return;
+                
+                const recordings = await window.app.databaseManager.getRecordings();
+                
+                if (recordings.length === 0) {
+                    console.log('Creating test data for export testing...');
+                    
+                    const userId = window.app.userManager.getUserId();
+                    const testRecording = {
+                        userId: userId,
+                        timestamp: new Date().toISOString(),
+                        status: 'completed',
+                        sampleRate: 140,
+                        batteryLevel: 1.0,
+                        endTime: new Date().toISOString(),
+                        dataPointCount: 3,
+                        averageHz: 140
+                    };
+                    
+                    const recordingId = await window.app.databaseManager.saveRecording(testRecording);
+                    
+                    const testDataPoints = [
+                        {
+                            recordingTimestamp: testRecording.timestamp,
+                            userId: userId,
+                            gpsTimestamp: new Date().toISOString(),
+                            gpsLat: 37.7749,
+                            gpsLon: -122.4194,
+                            gpsError: 5.0,
+                            timestamp: Date.now()
+                        },
+                        {
+                            recordingTimestamp: testRecording.timestamp,
+                            userId: userId,
+                            accelTimestamp: new Date().toISOString(),
+                            accelX: 0.1,
+                            accelY: 0.2,
+                            accelZ: 9.8,
+                            timestamp: Date.now()
+                        },
+                        {
+                            recordingTimestamp: testRecording.timestamp,
+                            userId: userId,
+                            gyroTimestamp: new Date().toISOString(),
+                            gyroAlpha: 1.5,
+                            gyroBeta: -0.8,
+                            gyroGamma: 0.3,
+                            timestamp: Date.now()
+                        }
+                    ];
+                    
+                    await window.app.databaseManager.saveDataPoints(testDataPoints, recordingId);
+                    console.log('✅ Test data created');
+                    
+                    // Update storage after creating data
+                    await updateStorageInfo();
+                }
+            } catch (error) {
+                console.warn('Could not create test data:', error);
+            }
+        }
+        
+        // Apply all fixes
+        await updateStorageInfo();
+        setupClearDataButton();
+        setupExportDataButton();
+        await createTestDataIfNeeded();
+        
+        // Update storage info every 30 seconds
+        setInterval(updateStorageInfo, 30000);
+        
+        console.log('✅ All quick fixes applied');
+        
+    }, 3000); // Wait 3 seconds for app initialization
+});
+</script>
+    
 </body>
 </html>
