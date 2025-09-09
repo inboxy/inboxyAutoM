@@ -1,1 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Recording PWA - Debug</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#6750A4">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2 class="card-title">Sensor Debug - Live Data</h2>
+            
+            <!-- GPS Status -->
+            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
+                <h3>GPS Status: <span id="gps-status" class="permission-status status-pending">Pending</span></h3>
+                <div>Latitude: <span id="gps-lat">--</span></div>
+                <div>Longitude: <span id="gps-lon">--</span></div>
+                <div>Accuracy: <span id="gps-error">-- m</span></div>
+                <div>Altitude: <span id="gps-alt">-- m</span></div>
+                <button id="gps-retry" style="display: none;">Retry GPS</button>
+            </div>
+            
+            <!-- Accelerometer Status -->
+            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
+                <h3>Accelerometer Status: <span id="accel-status" class="permission-status status-pending">Pending</span></h3>
+                <div>X: <span id="accel-x">-- m/s²</span></div>
+                <div>Y: <span id="accel-y">-- m/s²</span></div>
+                <div>Z: <span id="accel-z">-- m/s²</span></div>
+                <button id="accel-retry" style="display: none;">Retry Accelerometer</button>
+            </div>
+            
+            <!-- Gyroscope Status -->
+            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
+                <h3>Gyroscope Status: <span id="gyro-status" class="permission-status status-pending">Pending</span></h3>
+                <div>Alpha: <span id="gyro-alpha">-- °/s</span></div>
+                <div>Beta: <span id="gyro-beta">-- °/s</span></div>
+                <div>Gamma: <span id="gyro-gamma">-- °/s</span></div>
+                <button id="gyro-retry" style="display: none;">Retry Gyroscope</button>
+            </div>
+            
+            <!-- Controls -->
+            <div style="text-align: center; margin: 20px 0;">
+                <button id="start-btn" class="button button-primary">START RECORDING</button>
+                <button id="stop-btn" class="button button-error" style="display: none;">STOP RECORDING</button>
+            </div>
+            
+            <!-- Status -->
+            <div id="status-indicator" class="status-indicator status-idle">
+                <span>Ready to record</span>
+            </div>
+            
+            <!-- Debug Console -->
+            <div style="margin-top: 20px;">
+                <h3>Debug Console</h3>
+                <div id="debug-console" style="background: #f0f0f0; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+                <button onclick="clearDebugConsole()">Clear Console</button>
+            </div>
+        </div>
+        
+        <!-- Hidden elements that the app expects -->
+        <div style="display: none;">
+            <span id="user-id">test-user</span>
+            <span id="app-status">Ready</span>
+            <span id="online-status">Online</span>
+            <div id="post-recording-controls"></div>
+            <div id="sample-rate"></div>
+            <div id="data-count"></div>
+            <div id="buffer-size"></div>
+            <div id="recording-time"></div>
+            <div id="memory-usage"></div>
+        </div>
+    </div>
+    
+    <!-- Notification container -->
+    <div id="notification" class="notification" role="alert" aria-live="assertive"></div>
+    
+    <!-- Loading indicator -->
+    <div id="loading" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing...</div>
+    </div>
 
+    <!-- Debug Console Script -->
+    <script>
+        // Enhanced console logging for debugging
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        function addToDebugConsole(message, type = 'log') {
+            const console = document.getElementById('debug-console');
+            if (console) {
+                const timestamp = new Date().toLocaleTimeString();
+                const div = document.createElement('div');
+                div.style.color = type === 'error' ? 'red' : type === 'warn' ? 'orange' : 'black';
+                div.textContent = `[${timestamp}] ${message}`;
+                console.appendChild(div);
+                console.scrollTop = console.scrollHeight;
+            }
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToDebugConsole(args.join(' '), 'log');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToDebugConsole(args.join(' '), 'warn');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToDebugConsole(args.join(' '), 'error');
+        };
+        
+        function clearDebugConsole() {
+            const console = document.getElementById('debug-console');
+            if (console) {
+                console.innerHTML = '';
+            }
+        }
+        
+        // Performance Monitor Mock
+        window.performanceMonitor = {
+            start: () => console.log('Performance monitor started'),
+            stop: () => console.log('Performance monitor stopped'),
+            addSample: () => {},
+            updateSampleRate: (rate) => console.log('Sample rate:', rate),
+            updateBufferSize: (size) => console.log('Buffer size:', size)
+        };
+    </script>
+    
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    
+    <!-- Sensor Debug Helper -->
+    <script src="sensor-debug.js"></script>
+    
+    <!-- Nanoid fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
+    
+    <!-- Main Application Module -->
+    <script type="module">
+        import { ErrorBoundary } from './utils.js';
+        import { UserManager } from './user-manager.js';
+        import { SensorManager } from './sensors.js';
+        
+        // Simple debug version - just test sensors
+        class DebugApp {
+            constructor() {
+                console.log('🚀 Starting Debug App...');
+                this.userManager = new UserManager();
+                this.sensorManager = new SensorManager(this.handleSensorData.bind(this));
+                this.isRecording = false;
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    console.log('Initializing user manager...');
+                    await this.userManager.init();
+                    
+                    console.log('Checking sensor permissions...');
+                    await this.sensorManager.checkPermissions();
+                    
+                    console.log('Setting up UI...');
+                    this.setupUI();
+                    
+                    console.log('✅ Debug app initialized successfully');
+                    
+                } catch (error) {
+                    console.error('❌ Debug app initialization failed:', error);
+                    ErrorBoundary.handle(error, 'Debug App Init');
+                }
+            }
+            
+            setupUI() {
+                // Start button
+                document.getElementById('start-btn').addEventListener('click', () => {
+                    console.log('Start button clicked');
+                    this.startRecording();
+                });
+                
+                // Stop button  
+                document.getElementById('stop-btn').addEventListener('click', () => {
+                    console.log('Stop button clicked');
+                    this.stopRecording();
+                });
+                
+                // Retry buttons
+                document.getElementById('gps-retry')?.addEventListener('click', () => {
+                    console.log('GPS retry clicked');
+                    this.sensorManager.retryPermission('gps');
+                });
+                
+                document.getElementById('accel-retry')?.addEventListener('click', () => {
+                    console.log('Accelerometer retry clicked');
+                    this.sensorManager.retryPermission('accel');
+                });
+                
+                document.getElementById('gyro-retry')?.addEventListener('click', () => {
+                    console.log('Gyroscope retry clicked');
+                    this.sensorManager.retryPermission('gyro');
+                });
+            }
+            
+            handleSensorData(data) {
+                if (Array.isArray(data)) {
+                    console.log(`📊 Received batch of ${data.length} data points`);
+                } else {
+                    console.log('📊 Received single data point:', data);
+                }
+            }
+            
+            startRecording() {
+                console.log('🔴 Starting recording...');
+                this.isRecording = true;
+                
+                // Update UI
+                document.getElementById('start-btn').style.display = 'none';
+                document.getElementById('stop-btn').style.display = 'inline-block';
+                document.getElementById('status-indicator').innerHTML = '<span>🔴 Recording...</span>';
+                
+                // Start sensor tracking
+                this.sensorManager.startTracking(new Date().toISOString(), this.userManager.getUserId());
+            }
+            
+            stopRecording() {
+                console.log('⏹️ Stopping recording...');
+                this.isRecording = false;
+                
+                // Update UI
+                document.getElementById('start-btn').style.display = 'inline-block';
+                document.getElementById('stop-btn').style.display = 'none';
+                document.getElementById('status-indicator').innerHTML = '<span>✅ Recording stopped</span>';
+                
+                // Stop sensor tracking
+                this.sensorManager.stopTracking();
+            }
+            
+            showNotification(message, type) {
+                console.log(`📢 Notification (${type}): ${message}`);
+            }
+        }
+        
+        // Start the debug app
+        window.debugApp = new DebugApp();
+        window.app = window.debugApp; // For compatibility
+        
+    </script>
+    
+    <!-- Fallback for browsers without module support -->
+    <script nomodule>
+        document.body.innerHTML = `
+            <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                <h1>Browser Not Supported</h1>
+                <p>This application requires a modern browser with ES6 module support.</p>
+                <p>Please update your browser or try a different one.</p>
+            </div>
+        `;
+    </script>
+    
+</body>
+</html>
