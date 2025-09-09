@@ -1,5 +1,5 @@
 // ============================================
-// sensors.js - Sensor Management and Data Collection
+// sensors.js - Sensor Management and Data Collection - FIXED
 // ============================================
 
 import { ErrorBoundary, validateSensorData } from './utils.js';
@@ -17,7 +17,7 @@ export class SensorManager {
     
     async checkPermissions() {
         // Check GPS permission
-        if ('geolocation' in navigator) {
+        if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
             try {
                 await this.getCurrentPosition();
                 this.updatePermissionStatus('gps', 'granted');
@@ -32,7 +32,7 @@ export class SensorManager {
         }
         
         // Check motion sensors
-        if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
+        if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission === 'function') {
             try {
                 const permission = await DeviceMotionEvent.requestPermission();
                 if (permission === 'granted') {
@@ -41,14 +41,16 @@ export class SensorManager {
                 } else {
                     this.updatePermissionStatus('accel', 'denied');
                     this.updatePermissionStatus('gyro', 'denied');
-                    document.getElementById('accel-retry').style.display = 'inline-block';
-                    document.getElementById('gyro-retry').style.display = 'inline-block';
+                    const accelRetry = document.getElementById('accel-retry');
+                    const gyroRetry = document.getElementById('gyro-retry');
+                    if (accelRetry) accelRetry.style.display = 'inline-block';
+                    if (gyroRetry) gyroRetry.style.display = 'inline-block';
                 }
             } catch (error) {
                 this.updatePermissionStatus('accel', 'denied');
                 this.updatePermissionStatus('gyro', 'denied');
             }
-        } else if ('DeviceMotionEvent' in window) {
+        } else if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
             // For non-iOS devices, test if we're getting data
             this.testMotionSensors();
         } else {
@@ -58,6 +60,8 @@ export class SensorManager {
     }
     
     testMotionSensors() {
+        if (typeof window === 'undefined') return;
+        
         let hasData = false;
         
         const testHandler = (event) => {
@@ -86,24 +90,27 @@ export class SensorManager {
             try {
                 await this.getCurrentPosition();
                 this.updatePermissionStatus('gps', 'granted');
-                document.getElementById('gps-retry').style.display = 'none';
+                const retryBtn = document.getElementById('gps-retry');
+                if (retryBtn) retryBtn.style.display = 'none';
             } catch (error) {
-                if (window.app && window.app.showNotification) {
+                if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
                     window.app.showNotification('GPS permission denied. Please enable in browser settings.', 'error');
                 }
             }
         } else if (sensor === 'accel' || sensor === 'gyro') {
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            if (typeof window !== 'undefined' && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
                     const permission = await DeviceMotionEvent.requestPermission();
                     if (permission === 'granted') {
                         this.updatePermissionStatus('accel', 'granted');
                         this.updatePermissionStatus('gyro', 'granted');
-                        document.getElementById('accel-retry').style.display = 'none';
-                        document.getElementById('gyro-retry').style.display = 'none';
+                        const accelRetry = document.getElementById('accel-retry');
+                        const gyroRetry = document.getElementById('gyro-retry');
+                        if (accelRetry) accelRetry.style.display = 'none';
+                        if (gyroRetry) gyroRetry.style.display = 'none';
                     }
                 } catch (error) {
-                    if (window.app && window.app.showNotification) {
+                    if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
                         window.app.showNotification('Motion sensor permission denied. Please enable in browser settings.', 'error');
                     }
                 }
@@ -112,6 +119,8 @@ export class SensorManager {
     }
     
     updatePermissionStatus(sensor, status) {
+        if (typeof document === 'undefined') return;
+        
         const element = document.getElementById(`${sensor}-status`);
         if (element) {
             element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
@@ -120,6 +129,10 @@ export class SensorManager {
     }
     
     getCurrentPosition() {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            return Promise.reject(new Error('Geolocation not available'));
+        }
+        
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
@@ -142,6 +155,8 @@ export class SensorManager {
     }
     
     startGPSTracking(startTime, userId) {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+        
         const options = {
             enableHighAccuracy: true,
             timeout: 10000,
@@ -184,13 +199,15 @@ export class SensorManager {
     }
     
     stopGPSTracking() {
-        if (this.watchId) {
+        if (this.watchId && typeof navigator !== 'undefined' && navigator.geolocation) {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;
         }
     }
     
     startMotionTracking(startTime, userId) {
+        if (typeof window === 'undefined') return;
+        
         // Use passive listeners for better performance
         const options = { passive: true };
         
@@ -331,22 +348,41 @@ export class SensorManager {
     }
     
     updateGPSUI(lat, lon, accuracy, altitude) {
-        document.getElementById('gps-lat').textContent = lat.toFixed(6);
-        document.getElementById('gps-lon').textContent = lon.toFixed(6);
-        document.getElementById('gps-error').textContent = `${accuracy.toFixed(1)} m`;
-        document.getElementById('gps-alt').textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
+        if (typeof document === 'undefined') return;
+        
+        const latEl = document.getElementById('gps-lat');
+        const lonEl = document.getElementById('gps-lon');
+        const errorEl = document.getElementById('gps-error');
+        const altEl = document.getElementById('gps-alt');
+        
+        if (latEl) latEl.textContent = lat.toFixed(6);
+        if (lonEl) lonEl.textContent = lon.toFixed(6);
+        if (errorEl) errorEl.textContent = `${accuracy.toFixed(1)} m`;
+        if (altEl) altEl.textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
     }
     
     updateAccelUI(x, y, z) {
-        document.getElementById('accel-x').textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-        document.getElementById('accel-y').textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-        document.getElementById('accel-z').textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+        if (typeof document === 'undefined') return;
+        
+        const xEl = document.getElementById('accel-x');
+        const yEl = document.getElementById('accel-y');
+        const zEl = document.getElementById('accel-z');
+        
+        if (xEl) xEl.textContent = x ? `${x.toFixed(2)} m/s²` : '-- m/s²';
+        if (yEl) yEl.textContent = y ? `${y.toFixed(2)} m/s²` : '-- m/s²';
+        if (zEl) zEl.textContent = z ? `${z.toFixed(2)} m/s²` : '-- m/s²';
     }
     
     updateGyroUI(alpha, beta, gamma) {
-        document.getElementById('gyro-alpha').textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-        document.getElementById('gyro-beta').textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
-        document.getElementById('gyro-gamma').textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+        if (typeof document === 'undefined') return;
+        
+        const alphaEl = document.getElementById('gyro-alpha');
+        const betaEl = document.getElementById('gyro-beta');
+        const gammaEl = document.getElementById('gyro-gamma');
+        
+        if (alphaEl) alphaEl.textContent = alpha ? `${alpha.toFixed(2)} °/s` : '-- °/s';
+        if (betaEl) betaEl.textContent = beta ? `${beta.toFixed(2)} °/s` : '-- °/s';
+        if (gammaEl) gammaEl.textContent = gamma ? `${gamma.toFixed(2)} °/s` : '-- °/s';
     }
     
     adjustSampleRateForBattery(batteryLevel) {
@@ -356,11 +392,14 @@ export class SensorManager {
         } else if (batteryLevel < 0.5) {
             this.adaptiveSampleRate = 100;
         } else {
-            this.adaptiveSampleRate = window.MotionRecorderConfig?.sensors?.targetRate || 140;
+            const targetRate = (typeof window !== 'undefined' && window.MotionRecorderConfig?.sensors?.targetRate) || 140;
+            this.adaptiveSampleRate = targetRate;
         }
     }
     
     checkRecordingPermissions() {
+        if (typeof document === 'undefined') return false;
+        
         const gpsStatus = document.getElementById('gps-status')?.textContent.toLowerCase();
         const accelStatus = document.getElementById('accel-status')?.textContent.toLowerCase();
         const gyroStatus = document.getElementById('gyro-status')?.textContent.toLowerCase();
