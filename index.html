@@ -201,6 +201,33 @@
                     <span class="info-label">Online Status:</span>
                     <span id="online-status" class="info-value online">Online</span>
                 </div>
+                <div class="info-item">
+                    <span class="info-label">Storage:</span>
+                    <span id="storage-usage" class="info-value">Calculating...</span>
+                </div>
+            </div>
+            
+            <!-- Data Management Controls -->
+            <div class="data-management-controls" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--md-sys-color-outline-variant);">
+                <button id="clear-data-btn" class="button button-secondary" style="width: 100%; margin-bottom: 8px;" aria-describedby="clear-data-help">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                    CLEAR ALL DATA
+                </button>
+                <button id="export-data-btn" class="button button-secondary" style="width: 100%;" aria-describedby="export-data-help">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                    </svg>
+                    EXPORT ALL DATA
+                </button>
+                
+                <div id="clear-data-help" class="help-text" style="margin-top: 8px;">
+                    Remove all stored recordings, data points, and reset user ID. This action cannot be undone.
+                </div>
+                <div id="export-data-help" class="help-text">
+                    Download all stored data as a comprehensive JSON file including all recordings and metadata.
+                </div>
             </div>
         </div>
         
