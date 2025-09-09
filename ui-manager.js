@@ -195,23 +195,33 @@ export class UIManager {
     
     async updateStorageUsage() {
         try {
-            if (this.app.databaseManager) {
+            if (this.app.databaseManager && this.app.databaseManager.db) {
                 const storageInfo = await this.app.databaseManager.getDatabaseSize();
                 const storageEl = document.getElementById('storage-usage');
                 
                 if (storageEl && storageInfo) {
                     const usageMB = (storageInfo.usage / 1048576).toFixed(1);
-                    const quotaMB = (storageInfo.quota / 1048576).toFixed(0);
-                    storageEl.textContent = `${usageMB} MB / ${quotaMB} MB (${storageInfo.usagePercent}%)`;
+                    
+                    if (storageInfo.quota > 0) {
+                        const quotaMB = (storageInfo.quota / 1048576).toFixed(0);
+                        storageEl.textContent = `${usageMB} MB / ${quotaMB} MB (${storageInfo.usagePercent}%)`;
+                    } else {
+                        storageEl.textContent = `${usageMB} MB used`;
+                    }
                 } else if (storageEl) {
-                    storageEl.textContent = 'Unknown';
+                    storageEl.textContent = 'Calculating...';
+                }
+            } else {
+                const storageEl = document.getElementById('storage-usage');
+                if (storageEl) {
+                    storageEl.textContent = 'Not initialized';
                 }
             }
         } catch (error) {
             console.warn('Failed to update storage usage:', error);
             const storageEl = document.getElementById('storage-usage');
             if (storageEl) {
-                storageEl.textContent = 'Error';
+                storageEl.textContent = 'Error calculating';
             }
         }
     }
