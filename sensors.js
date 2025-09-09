@@ -1,5 +1,5 @@
 // ============================================
-// sensors.js - Sensor Management and Data Collection - COMPLETE FIX
+// sensors.js - Sensor Management with Gyroscope Fix
 // ============================================
 
 import { ErrorBoundary, validateSensorData } from './utils.js';
@@ -75,29 +75,65 @@ export class SensorManager {
     testMotionSensors() {
         if (typeof window === 'undefined') return;
         
-        let hasData = false;
+        let hasAccelData = false;
+        let hasGyroData = false;
         
         const testHandler = (event) => {
-            if (event.accelerationIncludingGravity || event.rotationRate) {
-                hasData = true;
-                this.updatePermissionStatus('accel', 'granted');
-                this.updatePermissionStatus('gyro', 'granted');
+            // Test acceleration data
+            if (event.accelerationIncludingGravity) {
+                const { x, y, z } = event.accelerationIncludingGravity;
+                if (x !== null || y !== null || z !== null) {
+                    hasAccelData = true;
+                    this.updatePermissionStatus('accel', 'granted');
+                }
+            }
+            
+            // Test gyroscope data - be more specific about what we're looking for
+            if (event.rotationRate) {
+                const { alpha, beta, gamma } = event.rotationRate;
+                console.log('Testing gyro data:', { alpha, beta, gamma });
+                
+                // Check if any gyro values are not null/undefined
+                if (alpha !== null || beta !== null || gamma !== null) {
+                    hasGyroData = true;
+                    this.updatePermissionStatus('gyro', 'granted');
+                    console.log('✅ Gyroscope data detected');
+                }
+            }
+            
+            // If we have both types of data, start motion tracking and stop testing
+            if (hasAccelData && hasGyroData) {
                 window.removeEventListener('devicemotion', testHandler);
-                // Start motion tracking for UI after detecting data
                 this.startMotionForUI();
             }
         };
         
         window.addEventListener('devicemotion', testHandler);
         
-        // If no data after 2 seconds, assume denied
+        // If no data after 3 seconds, check what we have
         setTimeout(() => {
-            if (!hasData) {
-                window.removeEventListener('devicemotion', testHandler);
+            window.removeEventListener('devicemotion', testHandler);
+            
+            if (hasAccelData) {
+                this.updatePermissionStatus('accel', 'granted');
+            } else {
                 this.updatePermissionStatus('accel', 'denied');
-                this.updatePermissionStatus('gyro', 'denied');
             }
-        }, 2000);
+            
+            if (hasGyroData) {
+                this.updatePermissionStatus('gyro', 'granted');
+            } else {
+                this.updatePermissionStatus('gyro', 'denied');
+                console.warn('❌ No gyroscope data detected. Device may not have gyroscope or needs movement to activate.');
+            }
+            
+            // Start motion tracking even if only partial data available
+            if (hasAccelData || hasGyroData) {
+                this.startMotionForUI();
+            }
+        }, 3000);
+        
+        console.log('Testing motion sensors... Move your device to activate them.');
     }
     
     async retryPermission(sensor) {
@@ -133,6 +169,9 @@ export class SensorManager {
                         window.app.showNotification('Motion sensor permission denied. Please enable in browser settings.', 'error');
                     }
                 }
+            } else {
+                // For non-iOS devices, re-test sensors
+                this.testMotionSensors();
             }
         }
     }
@@ -217,6 +256,8 @@ export class SensorManager {
     startMotionForUI() {
         if (typeof window === 'undefined') return;
         
+        console.log('🚀 Starting motion tracking for UI...');
+        
         // Clean up existing motion tracking
         if (this.cleanupMotion) {
             this.cleanupMotion();
@@ -230,13 +271,20 @@ export class SensorManager {
         let lastProcessTime = 0;
         let lastUIUpdate = 0;
         
-        // Minimal event handler - just store data
+        // Enhanced motion handler with better gyroscope handling
         const motionHandler = (event) => {
             latestMotionEvent = {
                 acceleration: event.accelerationIncludingGravity,
                 rotationRate: event.rotationRate,
                 timestamp: event.timeStamp || performance.now()
             };
+            
+            // Debug gyroscope data on first few events
+            if (performance.now() < 10000) { // First 10 seconds
+                if (event.rotationRate) {
+                    console.log('Gyro raw data:', event.rotationRate);
+                }
+            }
         };
         
         window.addEventListener('devicemotion', motionHandler, options);
@@ -263,13 +311,10 @@ export class SensorManager {
                 if (latestMotionEvent.acceleration) {
                     const { x, y, z } = latestMotionEvent.acceleration;
                     
-                    console.log('Accel data received:', { x, y, z });
-                    
                     if (validateSensorData('accel', { x, y, z })) {
                         // Throttled UI updates (10Hz) - Always update UI
                         if (currentTime - lastUIUpdate > 100) {
                             this.updateAccelUI(x, y, z);
-                            lastUIUpdate = currentTime;
                         }
                         
                         // Send data if recording (tracking mode)
@@ -287,16 +332,26 @@ export class SensorManager {
                     }
                 }
                 
-                // Process gyroscope
+                // Enhanced gyroscope processing
                 if (latestMotionEvent.rotationRate) {
-                    const { alpha, beta, gamma } = latestMotionEvent.rotationRate;
+                    const rotationRate = latestMotionEvent.rotationRate;
                     
-                    console.log('Gyro data received:', { alpha, beta, gamma });
+                    // More robust property access for gyroscope
+                    const alpha = rotationRate.alpha;
+                    const beta = rotationRate.beta;
+                    const gamma = rotationRate.gamma;
                     
-                    if (validateSensorData('gyro', { alpha, beta, gamma })) {
-                        // Throttled UI updates - Always update UI
+                    // Debug output for gyroscope
+                    if (now % 1000 < 50) { // Log roughly every second
+                        console.log('Gyro values:', { alpha, beta, gamma, rotationRate });
+                    }
+                    
+                    // Validate gyroscope data
+                    if (this.isValidGyroData(alpha, beta, gamma)) {
+                        // Always update UI for gyroscope
                         if (currentTime - lastUIUpdate > 100) {
                             this.updateGyroUI(alpha, beta, gamma);
+                            lastUIUpdate = currentTime;
                         }
                         
                         // Send data if recording (tracking mode)
@@ -311,6 +366,8 @@ export class SensorManager {
                                 timestamp: now
                             });
                         }
+                    } else {
+                        console.log('Invalid gyro data:', { alpha, beta, gamma });
                     }
                 }
                 
@@ -360,6 +417,16 @@ export class SensorManager {
                 this.batchInterval = null;
             }
         };
+        
+        console.log('✅ Motion tracking started');
+    }
+    
+    // Enhanced gyroscope data validation
+    isValidGyroData(alpha, beta, gamma) {
+        // Check if at least one value is a valid number
+        const isValidNumber = (val) => typeof val === 'number' && isFinite(val);
+        
+        return isValidNumber(alpha) || isValidNumber(beta) || isValidNumber(gamma);
     }
     
     startTracking(startTime, userId) {
@@ -368,9 +435,6 @@ export class SensorManager {
         this.recordingUserId = userId;
         
         console.log('Started recording mode - sensors will now save data');
-        
-        // Sensors are already running for UI, just enable data collection
-        // No need to restart - just set the recording flag and parameters
     }
     
     stopTracking() {
@@ -379,28 +443,6 @@ export class SensorManager {
         this.recordingUserId = null;
         
         console.log('Stopped recording mode - sensors continue for UI display only');
-        
-        // Don't stop sensors - keep them running for UI display
-        // Just disable data collection for recording
-    }
-    
-    // Legacy methods for backward compatibility - now just aliases
-    startGPSTracking(startTime, userId) {
-        this.startTracking(startTime, userId);
-    }
-    
-    stopGPSTracking() {
-        // Don't actually stop GPS - it should continue for UI
-        // This is handled in stopTracking()
-    }
-    
-    startMotionTracking(startTime, userId) {
-        this.startTracking(startTime, userId);
-    }
-    
-    stopMotionTracking() {
-        // Don't actually stop motion sensors - they should continue for UI
-        // This is handled in stopTracking()
     }
     
     updateGPSUI(lat, lon, accuracy, altitude) {
@@ -445,9 +487,37 @@ export class SensorManager {
             const betaEl = document.getElementById('gyro-beta');
             const gammaEl = document.getElementById('gyro-gamma');
             
-            if (alphaEl) alphaEl.textContent = (alpha !== null && alpha !== undefined) ? `${alpha.toFixed(2)} °/s` : '-- °/s';
-            if (betaEl) betaEl.textContent = (beta !== null && beta !== undefined) ? `${beta.toFixed(2)} °/s` : '-- °/s';
-            if (gammaEl) gammaEl.textContent = (gamma !== null && gamma !== undefined) ? `${gamma.toFixed(2)} °/s` : '-- °/s';
+            // Enhanced gyroscope UI updates with better null handling
+            if (alphaEl) {
+                if (alpha !== null && alpha !== undefined && isFinite(alpha)) {
+                    alphaEl.textContent = `${alpha.toFixed(2)} °/s`;
+                } else {
+                    alphaEl.textContent = '-- °/s';
+                }
+            }
+            
+            if (betaEl) {
+                if (beta !== null && beta !== undefined && isFinite(beta)) {
+                    betaEl.textContent = `${beta.toFixed(2)} °/s`;
+                } else {
+                    betaEl.textContent = '-- °/s';
+                }
+            }
+            
+            if (gammaEl) {
+                if (gamma !== null && gamma !== undefined && isFinite(gamma)) {
+                    gammaEl.textContent = `${gamma.toFixed(2)} °/s`;
+                } else {
+                    gammaEl.textContent = '-- °/s';
+                }
+            }
+            
+            // Log successful updates for debugging
+            const validValues = [alpha, beta, gamma].filter(val => val !== null && val !== undefined && isFinite(val));
+            if (validValues.length > 0) {
+                console.log('✅ Gyro UI updated:', { alpha, beta, gamma });
+            }
+            
         } catch (error) {
             console.warn('Error updating gyroscope UI:', error);
         }
