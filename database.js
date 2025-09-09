@@ -1,5 +1,5 @@
 // ============================================
-// database.js - IndexedDB Management
+// database.js - IndexedDB Management - Fixed Storage Info
 // ============================================
 
 import { ErrorBoundary } from './utils.js';
@@ -247,20 +247,104 @@ export class DatabaseManager {
         }
     }
     
+    // Fixed storage size calculation
     async getDatabaseSize() {
         try {
-            if (navigator.storage && navigator.storage.estimate) {
+            console.log('Calculating database size...');
+            
+            // Try modern storage API first
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
                 const estimate = await navigator.storage.estimate();
+                console.log('Storage estimate:', estimate);
+                
                 return {
-                    usage: estimate.usage,
-                    quota: estimate.quota,
-                    usagePercent: estimate.quota ? (estimate.usage / estimate.quota * 100).toFixed(2) : 0
+                    usage: estimate.usage || 0,
+                    quota: estimate.quota || 0,
+                    usagePercent: estimate.quota ? ((estimate.usage || 0) / estimate.quota * 100).toFixed(1) : '0'
                 };
             }
-            return null;
+            
+            // Fallback: try to estimate by counting records
+            const recordingCount = await this.getRecordCount('recordings');
+            const dataPointCount = await this.getRecordCount('dataPoints');
+            const metricsCount = await this.getRecordCount('performanceMetrics');
+            
+            // Rough estimate: 
+            // - Each recording: ~500 bytes
+            // - Each data point: ~200 bytes  
+            // - Each metric: ~100 bytes
+            const estimatedUsage = (recordingCount * 500) + (dataPointCount * 200) + (metricsCount * 100);
+            const estimatedQuota = 50 * 1024 * 1024; // Assume 50MB quota
+            
+            console.log('Fallback storage estimate:', {
+                recordings: recordingCount,
+                dataPoints: dataPointCount,
+                metrics: metricsCount,
+                estimatedUsage
+            });
+            
+            return {
+                usage: estimatedUsage,
+                quota: estimatedQuota,
+                usagePercent: (estimatedUsage / estimatedQuota * 100).toFixed(1)
+            };
+            
         } catch (error) {
-            console.warn('Cannot estimate storage usage:', error);
-            return null;
+            console.warn('Cannot calculate storage usage:', error);
+            return {
+                usage: 0,
+                quota: 0,
+                usagePercent: '0'
+            };
+        }
+    }
+    
+    // Helper method to count records in a store
+    async getRecordCount(storeName) {
+        try {
+            const transaction = this.db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore('store');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.count();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.warn(`Failed to count ${storeName}:`, error);
+            return 0;
+        }
+    }
+    
+    // Get detailed storage statistics
+    async getStorageStats() {
+        try {
+            const recordings = await this.getRecordings();
+            let totalDataPoints = 0;
+            
+            for (const recording of recordings) {
+                const dataPoints = await this.getDataPoints(recording.id);
+                totalDataPoints += dataPoints.length;
+            }
+            
+            const sizeInfo = await this.getDatabaseSize();
+            
+            return {
+                recordings: recordings.length,
+                dataPoints: totalDataPoints,
+                storageUsage: sizeInfo.usage,
+                storageQuota: sizeInfo.quota,
+                usagePercent: sizeInfo.usagePercent
+            };
+        } catch (error) {
+            console.warn('Failed to get storage stats:', error);
+            return {
+                recordings: 0,
+                dataPoints: 0,
+                storageUsage: 0,
+                storageQuota: 0,
+                usagePercent: '0'
+            };
         }
     }
 }
