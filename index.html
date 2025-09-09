@@ -3,73 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motion Recording PWA - Debug</title>
+    <title>Motion Recording PWA</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
     <meta name="theme-color" content="#6750A4">
+    <meta name="description" content="High-frequency sensor data recording application">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjgiIGZpbGw9IiNGRkZCRkUiLz4KPC9zdmc+Cg==">
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h2 class="card-title">Sensor Debug - Live Data</h2>
-            
-            <!-- GPS Status -->
-            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
-                <h3>GPS Status: <span id="gps-status" class="permission-status status-pending">Pending</span></h3>
-                <div>Latitude: <span id="gps-lat">--</span></div>
-                <div>Longitude: <span id="gps-lon">--</span></div>
-                <div>Accuracy: <span id="gps-error">-- m</span></div>
-                <div>Altitude: <span id="gps-alt">-- m</span></div>
-                <button id="gps-retry" style="display: none;">Retry GPS</button>
+            <h2 class="card-title">Sensor Permissions</h2>
+            <div class="permissions-grid">
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    <span>GPS</span>
+                    <span id="gps-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="gps-retry" class="retry-permission" style="display: none;" aria-label="Retry GPS permission">
+                        Retry
+                    </button>
+                </div>
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    <span>Accelerometer</span>
+                    <span id="accel-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="accel-retry" class="retry-permission" style="display: none;" aria-label="Retry accelerometer permission">
+                        Retry
+                    </button>
+                </div>
+                <div class="permission-item">
+                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    <span>Gyroscope</span>
+                    <span id="gyro-status" class="permission-status status-pending" aria-live="polite">Pending</span>
+                    <button id="gyro-retry" class="retry-permission" style="display: none;" aria-label="Retry gyroscope permission">
+                        Retry
+                    </button>
+                </div>
+            </div>
+
+            <!-- Performance Monitor Section -->
+            <div class="card">
+                <h2 class="card-title">Performance Monitor</h2>
+                <div class="performance-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Sample Rate:</span>
+                        <span id="sample-rate" class="stat-value">-- Hz</span>
+                        <div class="rate-indicator">
+                            <div id="rate-bar" class="rate-bar"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Data Points:</span>
+                        <span id="data-count" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Buffer Size:</span>
+                        <span id="buffer-size" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Recording Time:</span>
+                        <span id="recording-time" class="stat-value">00:00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Memory Usage:</span>
+                        <span id="memory-usage" class="stat-value">-- MB</span>
+                    </div>
+                </div>
             </div>
             
-            <!-- Accelerometer Status -->
-            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
-                <h3>Accelerometer Status: <span id="accel-status" class="permission-status status-pending">Pending</span></h3>
-                <div>X: <span id="accel-x">-- m/s²</span></div>
-                <div>Y: <span id="accel-y">-- m/s²</span></div>
-                <div>Z: <span id="accel-z">-- m/s²</span></div>
-                <button id="accel-retry" style="display: none;">Retry Accelerometer</button>
-            </div>
-            
-            <!-- Gyroscope Status -->
-            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
-                <h3>Gyroscope Status: <span id="gyro-status" class="permission-status status-pending">Pending</span></h3>
-                <div>Alpha: <span id="gyro-alpha">-- °/s</span></div>
-                <div>Beta: <span id="gyro-beta">-- °/s</span></div>
-                <div>Gamma: <span id="gyro-gamma">-- °/s</span></div>
-                <button id="gyro-retry" style="display: none;">Retry Gyroscope</button>
-            </div>
-            
-            <!-- Controls -->
-            <div style="text-align: center; margin: 20px 0;">
-                <button id="start-btn" class="button button-primary">START RECORDING</button>
-                <button id="stop-btn" class="button button-error" style="display: none;">STOP RECORDING</button>
-            </div>
-            
-            <!-- Status -->
-            <div id="status-indicator" class="status-indicator status-idle">
-                <span>Ready to record</span>
-            </div>
-            
-            <!-- Debug Console -->
-            <div style="margin-top: 20px;">
-                <h3>Debug Console</h3>
-                <div id="debug-console" style="background: #f0f0f0; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
-                <button onclick="clearDebugConsole()">Clear Console</button>
+            <div class="controls">
+                <div id="status-indicator" class="status-indicator status-idle" role="status" aria-live="polite">
+                    <span>Ready to record</span>
+                </div>
+                
+                <div class="recording-controls">
+                    <button id="start-btn" class="button button-primary" aria-describedby="recording-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        START RECORDING
+                    </button>
+                    <button id="stop-btn" class="button button-error" style="display: none;" aria-describedby="recording-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                        STOP RECORDING
+                    </button>
+                </div>
+                
+                <div id="recording-help" class="help-text">
+                    Recording will capture GPS location, accelerometer, and gyroscope data at high frequency.
+                </div>
+                
+                <div id="post-recording-controls" class="post-recording-controls">
+                    <button id="download-btn" class="button button-secondary" aria-describedby="download-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        DOWNLOAD CSV
+                    </button>
+                    <button id="upload-btn" class="button button-secondary" aria-describedby="upload-help">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                        </svg>
+                        UPLOAD JSON
+                    </button>
+                </div>
+                
+                <div id="download-help" class="help-text">
+                    Download recorded data as CSV file for analysis in spreadsheet applications.
+                </div>
+                <div id="upload-help" class="help-text">
+                    Upload recorded data to server for processing and storage.
+                </div>
             </div>
         </div>
         
-        <!-- Hidden elements that the app expects -->
-        <div style="display: none;">
-            <span id="user-id">test-user</span>
-            <span id="app-status">Ready</span>
-            <span id="online-status">Online</span>
-            <div id="post-recording-controls"></div>
-            <div id="sample-rate"></div>
-            <div id="data-count"></div>
-            <div id="buffer-size"></div>
-            <div id="recording-time"></div>
-            <div id="memory-usage"></div>
+        <div class="card">
+            <h2 class="card-title">Live Sensor Data</h2>
+            <div class="data-display">
+                <div class="data-group" role="group" aria-labelledby="gps-heading">
+                    <div id="gps-heading" class="data-group-title">GPS</div>
+                    <div class="data-item">
+                        <span class="data-label">Latitude:</span>
+                        <span id="gps-lat" class="data-value" aria-live="polite">--</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Longitude:</span>
+                        <span id="gps-lon" class="data-value" aria-live="polite">--</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Accuracy:</span>
+                        <span id="gps-error" class="data-value" aria-live="polite">-- m</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Altitude:</span>
+                        <span id="gps-alt" class="data-value" aria-live="polite">-- m</span>
+                    </div>
+                </div>
+                
+                <div class="data-group" role="group" aria-labelledby="accel-heading">
+                    <div id="accel-heading" class="data-group-title">Accelerometer</div>
+                    <div class="data-item">
+                        <span class="data-label">X:</span>
+                        <span id="accel-x" class="data-value" aria-live="polite">-- m/s²</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Y:</span>
+                        <span id="accel-y" class="data-value" aria-live="polite">-- m/s²</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Z:</span>
+                        <span id="accel-z" class="data-value" aria-live="polite">-- m/s²</span>
+                    </div>
+                </div>
+                
+                <div class="data-group" role="group" aria-labelledby="gyro-heading">
+                    <div id="gyro-heading" class="data-group-title">Gyroscope</div>
+                    <div class="data-item">
+                        <span class="data-label">Alpha:</span>
+                        <span id="gyro-alpha" class="data-value" aria-live="polite">-- °/s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Beta:</span>
+                        <span id="gyro-beta" class="data-value" aria-live="polite">-- °/s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Gamma:</span>
+                        <span id="gyro-gamma" class="data-value" aria-live="polite">-- °/s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title">Application Info</h2>
+            <div class="app-info">
+                <div class="info-item">
+                    <span class="info-label">User ID:</span>
+                    <span id="user-id" class="info-value">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Version:</span>
+                    <span class="info-value">2.0.0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status:</span>
+                    <span id="app-status" class="info-value">Initializing...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Online Status:</span>
+                    <span id="online-status" class="info-value online">Online</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="privacy-notice">
+            <p><strong>Privacy Notice:</strong> This application collects location and motion sensor data for research purposes. Data is stored locally on your device and only uploaded when you explicitly choose to do so. No data is transmitted without your consent.</p>
         </div>
     </div>
     
@@ -81,187 +217,241 @@
         <div class="loading-spinner"></div>
         <div class="loading-text">Processing...</div>
     </div>
+    
+    <!-- Performance Monitor Styles -->
+    <style>
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
 
-    <!-- Debug Console Script -->
+        .stat-item {
+            background: var(--md-sys-color-surface);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 12px;
+            color: var(--md-sys-color-on-surface-variant);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            display: block;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
+        }
+
+        .rate-indicator {
+            margin-top: 8px;
+            height: 4px;
+            background: var(--md-sys-color-surface-variant);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .rate-bar {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                var(--md-sys-color-error) 0%, 
+                var(--md-sys-color-warning) 50%, 
+                var(--md-sys-color-success) 100%);
+            width: 0%;
+            transition: width 200ms ease;
+        }
+
+        /* Color coding for sample rates */
+        .stat-value.rate-low { color: var(--md-sys-color-error); }
+        .stat-value.rate-medium { color: var(--md-sys-color-warning); }
+        .stat-value.rate-high { color: var(--md-sys-color-success); }
+        
+        /* Online status styling */
+        .info-value.online {
+            color: var(--md-sys-color-success);
+        }
+        
+        .info-value.offline {
+            color: var(--md-sys-color-error);
+        }
+    </style>
+
+    <!-- Performance Monitor Script -->
     <script>
-        // Enhanced console logging for debugging
-        const originalLog = console.log;
-        const originalWarn = console.warn;
-        const originalError = console.error;
-        
-        function addToDebugConsole(message, type = 'log') {
-            const console = document.getElementById('debug-console');
-            if (console) {
-                const timestamp = new Date().toLocaleTimeString();
-                const div = document.createElement('div');
-                div.style.color = type === 'error' ? 'red' : type === 'warn' ? 'orange' : 'black';
-                div.textContent = `[${timestamp}] ${message}`;
-                console.appendChild(div);
-                console.scrollTop = console.scrollHeight;
+        // Performance monitoring code
+        class PerformanceMonitor {
+            constructor() {
+                this.startTime = null;
+                this.dataCount = 0;
+                this.intervalId = null;
+                this.sampleTimes = [];
+                this.maxSamples = 100;
+            }
+            
+            start() {
+                this.startTime = Date.now();
+                this.dataCount = 0;
+                this.sampleTimes = [];
+                
+                this.intervalId = setInterval(() => {
+                    this.updateRecordingTime();
+                    this.updateMemoryUsage();
+                }, 1000);
+            }
+            
+            stop() {
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
+            }
+            
+            addSample() {
+                const now = Date.now();
+                this.sampleTimes.push(now);
+                this.dataCount++;
+                
+                if (this.sampleTimes.length > this.maxSamples) {
+                    this.sampleTimes.shift();
+                }
+                
+                if (this.sampleTimes.length > 1) {
+                    const duration = (now - this.sampleTimes[0]) / 1000;
+                    const rate = this.sampleTimes.length / duration;
+                    this.updateSampleRate(rate);
+                }
+                
+                const dataCountEl = document.getElementById('data-count');
+                if (dataCountEl) {
+                    dataCountEl.textContent = this.dataCount.toLocaleString();
+                }
+            }
+            
+            updateSampleRate(rate) {
+                const element = document.getElementById('sample-rate');
+                const barElement = document.getElementById('rate-bar');
+                
+                if (element) {
+                    element.textContent = `${rate.toFixed(1)} Hz`;
+                    
+                    if (rate < 50) {
+                        element.className = 'stat-value rate-low';
+                    } else if (rate < 100) {
+                        element.className = 'stat-value rate-medium';
+                    } else {
+                        element.className = 'stat-value rate-high';
+                    }
+                }
+                
+                if (barElement) {
+                    const percentage = Math.min((rate / 140) * 100, 100);
+                    barElement.style.width = `${percentage}%`;
+                }
+            }
+            
+            updateRecordingTime() {
+                if (!this.startTime) return;
+                
+                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                
+                const timeEl = document.getElementById('recording-time');
+                if (timeEl) {
+                    timeEl.textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+            
+            updateMemoryUsage() {
+                if (performance.memory) {
+                    const mb = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+                    const memoryEl = document.getElementById('memory-usage');
+                    if (memoryEl) {
+                        memoryEl.textContent = `${mb} MB`;
+                    }
+                }
+            }
+            
+            updateBufferSize(size) {
+                const bufferEl = document.getElementById('buffer-size');
+                if (bufferEl) {
+                    bufferEl.textContent = size.toLocaleString();
+                }
             }
         }
-        
-        console.log = function(...args) {
-            originalLog.apply(console, args);
-            addToDebugConsole(args.join(' '), 'log');
-        };
-        
-        console.warn = function(...args) {
-            originalWarn.apply(console, args);
-            addToDebugConsole(args.join(' '), 'warn');
-        };
-        
-        console.error = function(...args) {
-            originalError.apply(console, args);
-            addToDebugConsole(args.join(' '), 'error');
-        };
-        
-        function clearDebugConsole() {
-            const console = document.getElementById('debug-console');
-            if (console) {
-                console.innerHTML = '';
-            }
-        }
-        
-        // Performance Monitor Mock
-        window.performanceMonitor = {
-            start: () => console.log('Performance monitor started'),
-            stop: () => console.log('Performance monitor stopped'),
-            addSample: () => {},
-            updateSampleRate: (rate) => console.log('Sample rate:', rate),
-            updateBufferSize: (size) => console.log('Buffer size:', size)
-        };
+
+        window.performanceMonitor = new PerformanceMonitor();
     </script>
     
-    <!-- Configuration -->
+    <!-- Configuration and Scripts -->
     <script src="config.js"></script>
-    
-    <!-- Sensor Debug Helper -->
-    <script src="sensor-debug.js"></script>
-    
-    <!-- Nanoid fallback -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
     
     <!-- Main Application Module -->
-    <script type="module">
-        import { ErrorBoundary } from './utils.js';
-        import { UserManager } from './user-manager.js';
-        import { SensorManager } from './sensors.js';
+    <script type="module" src="app.js"></script>
+    
+    <!-- Feature detection and fallbacks -->
+    <script>
+        // Check for required features
+        const requiredFeatures = {
+            serviceWorker: 'serviceWorker' in navigator,
+            indexedDB: 'indexedDB' in window,
+            geolocation: 'geolocation' in navigator,
+            deviceMotion: 'DeviceMotionEvent' in window,
+            webWorkers: typeof Worker !== 'undefined',
+            modules: 'noModule' in HTMLScriptElement.prototype
+        };
         
-        // Simple debug version - just test sensors
-        class DebugApp {
-            constructor() {
-                console.log('🚀 Starting Debug App...');
-                this.userManager = new UserManager();
-                this.sensorManager = new SensorManager(this.handleSensorData.bind(this));
-                this.isRecording = false;
-                this.init();
-            }
+        // Display feature support info for debugging
+        if (window.location.search.includes('debug=true')) {
+            console.log('Feature support:', requiredFeatures);
+        }
+        
+        // Warn about missing critical features
+        const missingFeatures = Object.entries(requiredFeatures)
+            .filter(([, supported]) => !supported)
+            .map(([feature]) => feature);
             
-            async init() {
-                try {
-                    console.log('Initializing user manager...');
-                    await this.userManager.init();
-                    
-                    console.log('Checking sensor permissions...');
-                    await this.sensorManager.checkPermissions();
-                    
-                    console.log('Setting up UI...');
-                    this.setupUI();
-                    
-                    console.log('✅ Debug app initialized successfully');
-                    
-                } catch (error) {
-                    console.error('❌ Debug app initialization failed:', error);
-                    ErrorBoundary.handle(error, 'Debug App Init');
-                }
-            }
+        if (missingFeatures.length > 0) {
+            console.warn('Missing features:', missingFeatures);
             
-            setupUI() {
-                // Start button
-                document.getElementById('start-btn').addEventListener('click', () => {
-                    console.log('Start button clicked');
-                    this.startRecording();
-                });
-                
-                // Stop button  
-                document.getElementById('stop-btn').addEventListener('click', () => {
-                    console.log('Stop button clicked');
-                    this.stopRecording();
-                });
-                
-                // Retry buttons
-                document.getElementById('gps-retry')?.addEventListener('click', () => {
-                    console.log('GPS retry clicked');
-                    this.sensorManager.retryPermission('gps');
-                });
-                
-                document.getElementById('accel-retry')?.addEventListener('click', () => {
-                    console.log('Accelerometer retry clicked');
-                    this.sensorManager.retryPermission('accel');
-                });
-                
-                document.getElementById('gyro-retry')?.addEventListener('click', () => {
-                    console.log('Gyroscope retry clicked');
-                    this.sensorManager.retryPermission('gyro');
-                });
-            }
-            
-            handleSensorData(data) {
-                if (Array.isArray(data)) {
-                    console.log(`📊 Received batch of ${data.length} data points`);
-                } else {
-                    console.log('📊 Received single data point:', data);
-                }
-            }
-            
-            startRecording() {
-                console.log('🔴 Starting recording...');
-                this.isRecording = true;
-                
-                // Update UI
-                document.getElementById('start-btn').style.display = 'none';
-                document.getElementById('stop-btn').style.display = 'inline-block';
-                document.getElementById('status-indicator').innerHTML = '<span>🔴 Recording...</span>';
-                
-                // Start sensor tracking
-                this.sensorManager.startTracking(new Date().toISOString(), this.userManager.getUserId());
-            }
-            
-            stopRecording() {
-                console.log('⏹️ Stopping recording...');
-                this.isRecording = false;
-                
-                // Update UI
-                document.getElementById('start-btn').style.display = 'inline-block';
-                document.getElementById('stop-btn').style.display = 'none';
-                document.getElementById('status-indicator').innerHTML = '<span>✅ Recording stopped</span>';
-                
-                // Stop sensor tracking
-                this.sensorManager.stopTracking();
-            }
-            
-            showNotification(message, type) {
-                console.log(`📢 Notification (${type}): ${message}`);
+            if (missingFeatures.includes('modules')) {
+                document.body.innerHTML = `
+                    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                        <h1>Browser Not Supported</h1>
+                        <p>This application requires a modern browser with ES6 module support.</p>
+                        <p>Please update your browser or try a different one.</p>
+                        <p>Missing features: ${missingFeatures.join(', ')}</p>
+                    </div>
+                `;
             }
         }
         
-        // Start the debug app
-        window.debugApp = new DebugApp();
-        window.app = window.debugApp; // For compatibility
+        // Update online status
+        function updateOnlineStatus() {
+            const statusEl = document.getElementById('online-status');
+            if (statusEl) {
+                const isOnline = navigator.onLine;
+                statusEl.textContent = isOnline ? 'Online' : 'Offline';
+                statusEl.className = `info-value ${isOnline ? 'online' : 'offline'}`;
+            }
+        }
         
+        // Monitor online/offline status
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Initial status check
+        document.addEventListener('DOMContentLoaded', updateOnlineStatus);
     </script>
-    
-    <!-- Fallback for browsers without module support -->
-    <script nomodule>
-        document.body.innerHTML = `
-            <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
-                <h1>Browser Not Supported</h1>
-                <p>This application requires a modern browser with ES6 module support.</p>
-                <p>Please update your browser or try a different one.</p>
-            </div>
-        `;
-    </script>
-    
 </body>
 </html>
