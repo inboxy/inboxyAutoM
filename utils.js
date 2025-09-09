@@ -1,6 +1,5 @@
-
 // ============================================
-// utils.js - Utility Functions and Error Handling
+// utils.js - Utility Functions and Error Handling - FIXED
 // ============================================
 
 // Robust ID generation fallback (no dependency on nanoid)
@@ -30,9 +29,9 @@ export function generateId(length = 10) {
 export function setupNanoidFallback() {
     let nanoidAvailable = false;
     try {
-        if (typeof nanoid === 'function') {
+        if (typeof window !== 'undefined' && typeof window.nanoid === 'function') {
             // Test nanoid to make sure it works
-            const test = nanoid(5);
+            const test = window.nanoid(5);
             if (test && test.length === 5) {
                 nanoidAvailable = true;
             }
@@ -61,12 +60,12 @@ export class ErrorBoundary {
         console.error(`Error in ${context}:`, error);
         
         // Show user-friendly notification
-        if (window.app && window.app.showNotification) {
+        if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
             window.app.showNotification(`An error occurred in ${context}. Please try again.`, 'error');
         }
         
         // Report to monitoring service if configured
-        if (window.MotionRecorderConfig?.features?.errorReporting) {
+        if (typeof window !== 'undefined' && window.MotionRecorderConfig?.features?.errorReporting) {
             this.reportError(error, context);
         }
     }
@@ -83,6 +82,8 @@ export class ErrorBoundary {
 
 // Notification utility
 export function showNotification(message, type = 'info', duration = 5000) {
+    if (typeof document === 'undefined') return;
+    
     const notification = document.getElementById('notification');
     if (!notification) return;
     
@@ -96,6 +97,8 @@ export function showNotification(message, type = 'info', duration = 5000) {
 
 // Data validation utilities
 export function validateSensorData(type, data) {
+    if (typeof window === 'undefined') return true;
+    
     const config = window.MotionRecorderConfig?.sensors;
     if (!config?.dataValidation) return true;
     
@@ -127,15 +130,19 @@ export function validateSensorData(type, data) {
 
 // Cookie utilities
 export function setCookie(name, value, days = 365) {
+    if (typeof document === 'undefined') return;
+    
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
     
     // Add Secure flag only if on HTTPS
-    const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+    const secureFlag = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? '; Secure' : '';
     document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
 }
 
 export function getCookie(name) {
+    if (typeof document === 'undefined') return null;
+    
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
         const [cookieName, value] = cookie.trim().split('=');
