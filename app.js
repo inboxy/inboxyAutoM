@@ -1,5 +1,5 @@
 // ============================================
-// app.js - CORRECTED VERSION
+// app.js - FIXED VERSION - Console Errors Resolved
 // ============================================
 
 // Robust ID generation fallback (no dependency on nanoid)
@@ -25,9 +25,29 @@ function generateId(length = 10) {
     return result;
 }
 
-// Try to use nanoid if it loaded from CDN, otherwise use our fallback
-if (typeof window !== 'undefined' && typeof nanoid === 'undefined') {
-    window.nanoid = generateId;
+// Check if nanoid is available and working
+let nanoidAvailable = false;
+try {
+    if (typeof nanoid === 'function') {
+        // Test nanoid to make sure it works
+        const test = nanoid(5);
+        if (test && test.length === 5) {
+            nanoidAvailable = true;
+        }
+    }
+} catch (error) {
+    console.warn('Nanoid not available or has errors, using fallback:', error.message);
+}
+
+// Set up fallback if nanoid is not available
+if (!nanoidAvailable) {
+    if (typeof window !== 'undefined') {
+        window.nanoid = generateId;
+    }
+    // Also create global nanoid for compatibility
+    if (typeof globalThis !== 'undefined') {
+        globalThis.nanoid = generateId;
+    }
 }
 
 // Error boundary for better error handling
@@ -108,8 +128,13 @@ class MotionRecorderApp {
         if (!userId) {
             // Generate new 10 character unique ID
             // Use nanoid if available, otherwise use our fallback
-            if (typeof nanoid === 'function') {
-                userId = nanoid(10);
+            if (nanoidAvailable && typeof nanoid === 'function') {
+                try {
+                    userId = nanoid(10);
+                } catch (error) {
+                    console.warn('Nanoid failed, using fallback:', error);
+                    userId = generateId(10);
+                }
             } else {
                 userId = generateId(10);
             }
@@ -198,37 +223,44 @@ class MotionRecorderApp {
     }
     
     initWorker() {
-        this.worker = new Worker('worker.js');
-        
-        this.worker.addEventListener('message', (e) => {
-            const { type, data } = e.data;
+        try {
+            this.worker = new Worker('worker.js');
             
-            switch(type) {
-                case 'RECORDING_STARTED':
-                    console.log('Worker: Recording started');
-                    break;
-                    
-                case 'RECORDING_STOPPED':
-                    this.saveRecordingData(data.data, data.stats);
-                    break;
-                    
-                case 'CSV_GENERATED':
-                    this.downloadCSVFile(data);
-                    break;
-                    
-                case 'STATS_UPDATE':
-                    this.updateStats(data);
-                    break;
-                    
-                case 'WORKER_ERROR':
-                    ErrorBoundary.handle(new Error(data), 'Worker');
-                    break;
-            }
-        });
-        
-        this.worker.addEventListener('error', (error) => {
-            ErrorBoundary.handle(error, 'Worker');
-        });
+            this.worker.addEventListener('message', (e) => {
+                const { type, data } = e.data;
+                
+                switch(type) {
+                    case 'RECORDING_STARTED':
+                        console.log('Worker: Recording started');
+                        break;
+                        
+                    case 'RECORDING_STOPPED':
+                        this.saveRecordingData(data.data, data.stats);
+                        break;
+                        
+                    case 'CSV_GENERATED':
+                        this.downloadCSVFile(data);
+                        break;
+                        
+                    case 'STATS_UPDATE':
+                        this.updateStats(data);
+                        break;
+                        
+                    case 'WORKER_ERROR':
+                        ErrorBoundary.handle(new Error(data), 'Worker');
+                        break;
+                }
+            });
+            
+            this.worker.addEventListener('error', (error) => {
+                console.error('Worker error details:', error);
+                ErrorBoundary.handle(error, 'Worker');
+            });
+            
+        } catch (error) {
+            console.error('Failed to initialize worker:', error);
+            ErrorBoundary.handle(error, 'Worker Initialization');
+        }
     }
     
     async initBatteryMonitoring() {
@@ -295,6 +327,7 @@ class MotionRecorderApp {
                 this.updatePermissionStatus('gps', 'granted');
                 this.startGPSTracking();
             } catch (error) {
+                console.warn('GPS permission error:', error);
                 this.updatePermissionStatus('gps', 'denied');
                 const retryBtn = document.getElementById('gps-retry');
                 if (retryBtn) retryBtn.style.display = 'inline-block';
@@ -395,8 +428,8 @@ class MotionRecorderApp {
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
+                timeout: 15000, // Increased timeout to 15 seconds
+                maximumAge: 5000 // Allow cached position up to 5 seconds old
             });
         });
     }
@@ -404,8 +437,8 @@ class MotionRecorderApp {
     startGPSTracking() {
         const options = {
             enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
+            timeout: 10000, // 10 second timeout for position updates
+            maximumAge: 2000 // Accept positions up to 2 seconds old
         };
         
         this.watchId = navigator.geolocation.watchPosition(
@@ -420,7 +453,7 @@ class MotionRecorderApp {
                 document.getElementById('gps-alt').textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
                 
                 // Send to worker if recording
-                if (this.isRecording) {
+                if (this.isRecording && this.worker) {
                     this.worker.postMessage({
                         type: 'ADD_DATA_POINT',
                         data: {
@@ -440,8 +473,11 @@ class MotionRecorderApp {
                 }
             },
             (error) => {
-                console.error('GPS error:', error);
-                this.updatePermissionStatus('gps', 'denied');
+                console.warn('GPS error:', error.message);
+                // Don't change permission status for timeout errors
+                if (error.code !== 3) { // TIMEOUT = 3
+                    this.updatePermissionStatus('gps', 'denied');
+                }
             },
             options
         );
@@ -540,7 +576,7 @@ class MotionRecorderApp {
                 }
                 
                 // Send batches when they reach target size
-                if (accelBatch.length >= 10) {
+                if (this.worker && accelBatch.length >= 10) {
                     this.worker.postMessage({
                         type: 'ADD_DATA_BATCH',
                         data: [...accelBatch]
@@ -548,7 +584,7 @@ class MotionRecorderApp {
                     accelBatch = [];
                 }
                 
-                if (gyroBatch.length >= 10) {
+                if (this.worker && gyroBatch.length >= 10) {
                     this.worker.postMessage({
                         type: 'ADD_DATA_BATCH',
                         data: [...gyroBatch]
@@ -567,19 +603,21 @@ class MotionRecorderApp {
         
         // Periodic batch flush for remaining data
         this.batchInterval = setInterval(() => {
-            if (accelBatch.length > 0) {
-                this.worker.postMessage({
-                    type: 'ADD_DATA_BATCH',
-                    data: [...accelBatch]
-                });
-                accelBatch = [];
-            }
-            if (gyroBatch.length > 0) {
-                this.worker.postMessage({
-                    type: 'ADD_DATA_BATCH',
-                    data: [...gyroBatch]
-                });
-                gyroBatch = [];
+            if (this.worker) {
+                if (accelBatch.length > 0) {
+                    this.worker.postMessage({
+                        type: 'ADD_DATA_BATCH',
+                        data: [...accelBatch]
+                    });
+                    accelBatch = [];
+                }
+                if (gyroBatch.length > 0) {
+                    this.worker.postMessage({
+                        type: 'ADD_DATA_BATCH',
+                        data: [...gyroBatch]
+                    });
+                    gyroBatch = [];
+                }
             }
         }, 100);
         
@@ -675,7 +713,9 @@ class MotionRecorderApp {
             }
             
             // Start worker recording
-            this.worker.postMessage({ type: 'START_RECORDING' });
+            if (this.worker) {
+                this.worker.postMessage({ type: 'START_RECORDING' });
+            }
             
             // Create recording entry in IndexedDB
             const transaction = this.db.transaction(['recordings'], 'readwrite');
@@ -742,7 +782,9 @@ class MotionRecorderApp {
             statusIndicator.innerHTML = '<span>Recording completed</span>';
             
             // Stop worker recording
-            this.worker.postMessage({ type: 'STOP_RECORDING' });
+            if (this.worker) {
+                this.worker.postMessage({ type: 'STOP_RECORDING' });
+            }
             
         } catch (error) {
             ErrorBoundary.handle(error, 'Stop Recording');
@@ -780,44 +822,3 @@ class MotionRecorderApp {
             
             // Save data points in chunks to avoid memory issues
             const CHUNK_SIZE = 1000;
-            const chunks = Math.ceil(data.length / CHUNK_SIZE);
-            
-            for (let i = 0; i < chunks; i++) {
-                const chunk = data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                const dataTransaction = this.db.transaction(['dataPoints'], 'readwrite');
-                const dataStore = dataTransaction.objectStore('dataPoints');
-                
-                for (const point of chunk) {
-                    point.recordingId = this.currentRecordingId;
-                    dataStore.add(point);
-                }
-            }
-            
-            console.log(`Saved ${data.length} data points to IndexedDB`);
-            this.showNotification(`Recording saved: ${data.length} data points at ${stats?.averageHz?.toFixed(1) || 0} Hz average`, 'success');
-            
-        } catch (error) {
-            ErrorBoundary.handle(error, 'Save Recording Data');
-        }
-    }
-    
-    updateStats(stats) {
-        if (this.performanceMonitor) {
-            this.performanceMonitor.updateBufferSize(stats.bufferSize || 0);
-        }
-        
-        // Update any other UI elements with stats
-        if (stats.averageHz) {
-            console.log(`Current average sample rate: ${stats.averageHz} Hz`);
-        }
-    }
-    
-    async downloadCSV() {
-        try {
-            if (!this.currentRecordingId) {
-                this.showNotification('No recording available to download', 'warning');
-                return;
-            }
-            
-            // Show loading indicator
-            this.
