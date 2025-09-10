@@ -253,13 +253,14 @@ function clearData() {
     console.log('Worker: Data cleared');
 }
 
-// Optimized CSV generation with streaming approach
+// Fixed CSV generation function in worker.js
 function generateCSV(data) {
     try {
         console.log('Worker: Generating CSV for', data.length, 'data points');
         
+        // Updated headers to be more clear about what each timestamp represents
         const headers = [
-            'Recording Date Timestamp', 'User ID', 'GPS Date Timestamp',
+            'Data Point Timestamp', 'Recording Session Start', 'User ID', 'GPS Date Timestamp',
             'GPS LAT', 'GPS LON', 'GPS ERROR', 'GPS ALT', 'GPS ALT ACCURACY',
             'GPS HEADING', 'GPS SPEED', 'Accel Date Timestamp',
             'Accel X', 'Accel Y', 'Accel Z', 'Gyro Date Timestamp',
@@ -269,7 +270,7 @@ function generateCSV(data) {
         // Use array for better performance than string concatenation
         const csvLines = [headers.join(',')];
         
-        // Sort data once
+        // Sort data once by the actual timestamp (when the data point was captured)
         if (data && data.length > 0) {
             data.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         }
@@ -288,7 +289,7 @@ function generateCSV(data) {
             for (let i = currentIndex; i < endIndex; i++) {
                 const point = data[i];
                 
-                // Efficient frequency calculation
+                // Efficient frequency calculation using the actual data point timestamp
                 let sampleTime = 0;
                 let frequency = 0;
                 
@@ -305,9 +306,13 @@ function generateCSV(data) {
                 // Calculate average frequency
                 const avgFrequency = frequencyWindow.reduce((a, b) => a + b, 0) / frequencyWindow.length;
                 
-                // Build row efficiently
+                // Convert timestamp to readable format for the first column
+                const dataPointTimestamp = point.timestamp ? new Date(point.timestamp).toISOString() : '';
+                
+                // Build row efficiently - FIXED: Use actual data point timestamp as first column
                 const row = [
-                    escapeCSVField(point.recordingTimestamp || ''),
+                    escapeCSVField(dataPointTimestamp),                    // Unique timestamp for each data point
+                    escapeCSVField(point.recordingTimestamp || ''),        // Recording session start time
                     escapeCSVField(point.userId || ''),
                     escapeCSVField(point.gpsTimestamp || ''),
                     formatNumber(point.gpsLat),
@@ -394,6 +399,19 @@ function generateCSV(data) {
         });
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Optimized number formatting
 function formatNumber(value) {
