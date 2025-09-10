@@ -253,6 +253,80 @@ class MotionRecorderApp {
             ErrorBoundary.handle(error, 'Download CSV');
         }
     }
+
+/ Updated app.js - exportAllData method (for JSON export)
+async exportAllData() {
+    try {
+        this.uiManager.showLoadingState('Exporting all data...');
+        
+        if (!this.databaseManager || !this.databaseManager.db) {
+            throw new Error('Database not initialized');
+        }
+        
+        // Get all recordings
+        const recordings = await this.databaseManager.getRecordings();
+        
+        if (recordings.length === 0) {
+            this.uiManager.showNotification('No data to export. Record some data first.', 'warning');
+            this.uiManager.hideLoadingState();
+            return;
+        }
+        
+        const exportData = {
+            metadata: {
+                exportDate: new Date().toISOString(),
+                userId: this.userManager.getUserId(),
+                version: '2.0.0',
+                totalRecordings: recordings.length
+            },
+            recordings: []
+        };
+        
+        // Get data points for each recording
+        for (const recording of recordings) {
+            const dataPoints = await this.databaseManager.getDataPoints(recording.id);
+            exportData.recordings.push({
+                ...recording,
+                dataPoints: dataPoints
+            });
+        }
+        
+        // Create and download file with userID in filename
+        const jsonContent = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const userId = this.userManager.getUserId();
+        const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `motion-recorder-export-${userId}-${timestamp}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        URL.revokeObjectURL(url);
+        
+        this.uiManager.hideLoadingState();
+        
+        const totalDataPoints = exportData.recordings.reduce((sum, r) => sum + r.dataPoints.length, 0);
+        this.uiManager.showNotification(
+            `✅ Exported ${recordings.length} recordings with ${totalDataPoints} data points`,
+            'success'
+        );
+        console.log('✅ Export completed with filename:', a.download);
+        
+    } catch (error) {
+        this.uiManager.hideLoadingState();
+        console.error('Export failed:', error);
+        this.uiManager.showNotification('❌ Export failed: ' + error.message, 'error');
+    }
+}
+
+
+
+
     
     async uploadJSON() {
         try {
