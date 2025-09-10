@@ -253,14 +253,14 @@ function clearData() {
     console.log('Worker: Data cleared');
 }
 
-// Fixed CSV generation function in worker.js
+// Optimized CSV generation with streaming approach
 function generateCSV(data) {
     try {
         console.log('Worker: Generating CSV for', data.length, 'data points');
         
-        // Updated headers to be more clear about what each timestamp represents
+        // Updated headers with Recording Session Start column removed
         const headers = [
-            'Data Point Timestamp', 'Recording Session Start', 'User ID', 'GPS Date Timestamp',
+            'Data Point Timestamp', 'User ID', 'GPS Date Timestamp',
             'GPS LAT', 'GPS LON', 'GPS ERROR', 'GPS ALT', 'GPS ALT ACCURACY',
             'GPS HEADING', 'GPS SPEED', 'Accel Date Timestamp',
             'Accel X', 'Accel Y', 'Accel Z', 'Gyro Date Timestamp',
@@ -309,10 +309,9 @@ function generateCSV(data) {
                 // Convert timestamp to readable format for the first column
                 const dataPointTimestamp = point.timestamp ? new Date(point.timestamp).toISOString() : '';
                 
-                // Build row efficiently - FIXED: Use actual data point timestamp as first column
+                // Build row efficiently - Recording Session Start column removed
                 const row = [
                     escapeCSVField(dataPointTimestamp),                    // Unique timestamp for each data point
-                    escapeCSVField(point.recordingTimestamp || ''),        // Recording session start time
                     escapeCSVField(point.userId || ''),
                     escapeCSVField(point.gpsTimestamp || ''),
                     formatNumber(point.gpsLat),
@@ -348,65 +347,64 @@ function generateCSV(data) {
             }
         }
         
-
-
-
-// In the finishCSV function, include userID in the summary
-function finishCSV() {
-    // Add summary statistics
-    const duration = data.length > 1 
-        ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
-        : 0;
-    const averageHz = duration > 0 ? data.length / duration : 0;
-    
-    // Get userID from the first data point
-    const userId = data.length > 0 ? data[0].userId : 'unknown';
-    
-    // Count different data types
-    const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
-    const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
-    const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
-    
-    csvLines.push('');
-    csvLines.push('# Summary Statistics');
-    csvLines.push(`# User ID,${userId}`);
-    csvLines.push(`# Export Date,${new Date().toISOString()}`);
-    csvLines.push(`# Total Samples,${data.length}`);
-    csvLines.push(`# GPS Samples,${gpsCount}`);
-    csvLines.push(`# Accelerometer Samples,${accelCount}`);
-    csvLines.push(`# Gyroscope Samples,${gyroCount}`);
-    csvLines.push(`# Duration (seconds),${duration.toFixed(2)}`);
-    csvLines.push(`# Average Sample Rate (Hz),${averageHz.toFixed(2)}`);
-    
-    if (gpsCount > 0) {
-        csvLines.push(`# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}`);
+        function finishCSV() {
+            // Add summary statistics
+            const duration = data.length > 1 
+                ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
+                : 0;
+            const averageHz = duration > 0 ? data.length / duration : 0;
+            
+            // Get userID from the first data point
+            const userId = data.length > 0 ? data[0].userId : 'unknown';
+            
+            // Count different data types
+            const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
+            const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
+            const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
+            
+            csvLines.push('');
+            csvLines.push('# Summary Statistics');
+            csvLines.push(`# User ID,${userId}`);
+            csvLines.push(`# Export Date,${new Date().toISOString()}`);
+            csvLines.push(`# Total Samples,${data.length}`);
+            csvLines.push(`# GPS Samples,${gpsCount}`);
+            csvLines.push(`# Accelerometer Samples,${accelCount}`);
+            csvLines.push(`# Gyroscope Samples,${gyroCount}`);
+            csvLines.push(`# Duration (seconds),${duration.toFixed(2)}`);
+            csvLines.push(`# Average Sample Rate (Hz),${averageHz.toFixed(2)}`);
+            
+            if (gpsCount > 0) {
+                csvLines.push(`# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}`);
+            }
+            if (accelCount > 0) {
+                csvLines.push(`# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}`);
+            }
+            if (gyroCount > 0) {
+                csvLines.push(`# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}`);
+            }
+            
+            const csvContent = csvLines.join('\n');
+            console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
+            
+            // Include userID in the response so the main thread can use it for filename
+            self.postMessage({ 
+                type: 'CSV_GENERATED', 
+                data: csvContent,
+                userId: userId
+            });
+        }
+        
+        // Start processing
+        processChunk();
+        
+    } catch (error) {
+        console.error('Worker: Error generating CSV:', error);
+        self.postMessage({
+            type: 'WORKER_ERROR',
+            data: `Failed to generate CSV: ${error.message}`
+        });
     }
-    if (accelCount > 0) {
-        csvLines.push(`# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}`);
-    }
-    if (gyroCount > 0) {
-        csvLines.push(`# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}`);
-    }
-    
-    const csvContent = csvLines.join('\n');
-    console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
-    
-    // Include userID in the response so the main thread can use it for filename
-    self.postMessage({ 
-        type: 'CSV_GENERATED', 
-        data: csvContent,
-        userId: userId
-    });
 }
-
-
-
-
-
-
-
-
-
 
 // Optimized number formatting
 function formatNumber(value) {
@@ -464,4 +462,4 @@ self.addEventListener('unhandledrejection', function(event) {
     });
 });
 
-console.log('Worker: Initialized and ready. Version 1.1.0 - Optimized for 140Hz');
+console.log('Worker: Initialized and ready. Version 1.2.0 - Optimized for 140Hz with UserID in CSV');
