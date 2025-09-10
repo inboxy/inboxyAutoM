@@ -1,5 +1,5 @@
 // ============================================
-// ui-manager.js - UI Management and Event Handling - Updated
+// ui-manager.js - UI Management and Event Handling - Complete Fixed Version
 // ============================================
 
 import { showNotification } from './utils.js';
@@ -19,31 +19,52 @@ export class UIManager {
     
     setupEventListeners() {
         // Recording controls
-        document.getElementById('start-btn').addEventListener('click', () => {
-            this.app.startRecording();
-        });
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
         
-        document.getElementById('stop-btn').addEventListener('click', () => {
-            this.app.stopRecording();
-        });
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                this.app.startRecording();
+            });
+        }
+        
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                this.app.stopRecording();
+            });
+        }
         
         // Data export controls
-        document.getElementById('download-btn').addEventListener('click', () => {
-            this.app.downloadCSV();
-        });
+        const downloadBtn = document.getElementById('download-btn');
+        const uploadBtn = document.getElementById('upload-btn');
         
-        document.getElementById('upload-btn').addEventListener('click', () => {
-            this.app.uploadJSON();
-        });
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => {
+                this.app.downloadCSV();
+            });
+        }
+        
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => {
+                this.app.uploadJSON();
+            });
+        }
         
         // Data management controls
-        document.getElementById('clear-data-btn').addEventListener('click', () => {
-            this.confirmAndClearData();
-        });
+        const clearBtn = document.getElementById('clear-data-btn');
+        const exportBtn = document.getElementById('export-data-btn');
         
-        document.getElementById('export-data-btn').addEventListener('click', () => {
-            this.app.exportAllData();
-        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.confirmAndClearData();
+            });
+        }
+        
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.app.exportAllData();
+            });
+        }
         
         // Permission retry buttons
         const retryButtons = document.querySelectorAll('.retry-permission');
@@ -236,50 +257,54 @@ export class UIManager {
     
     showRecordingState() {
         // Update UI for recording state
-        document.getElementById('start-btn').style.display = 'none';
-        document.getElementById('stop-btn').style.display = 'inline-flex';
-        document.getElementById('post-recording-controls').classList.remove('visible');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const postControls = document.getElementById('post-recording-controls');
+        
+        if (startBtn) startBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'inline-flex';
+        if (postControls) postControls.classList.remove('visible');
         
         const statusIndicator = document.getElementById('status-indicator');
-        statusIndicator.className = 'status-indicator status-recording pulse';
-        statusIndicator.innerHTML = '<span>● Recording...</span>';
+        if (statusIndicator) {
+            statusIndicator.className = 'status-indicator status-recording pulse';
+            statusIndicator.innerHTML = '<span>● Recording...</span>';
+        }
         
         // Disable data management during recording
-        document.getElementById('clear-data-btn').disabled = true;
-        document.getElementById('export-data-btn').disabled = true;
+        const clearBtn = document.getElementById('clear-data-btn');
+        const exportBtn = document.getElementById('export-data-btn');
+        if (clearBtn) clearBtn.disabled = true;
+        if (exportBtn) exportBtn.disabled = true;
     }
     
     showIdleState() {
         // Update UI for idle state
-        document.getElementById('start-btn').style.display = 'inline-flex';
-        document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('post-recording-controls').classList.add('visible');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const postControls = document.getElementById('post-recording-controls');
         
-        const statusIndicator = document.getElementById('status-indicator');
-        statusIndicator.className = 'status-indicator status-idle';
-        statusIndicator.innerHTML = '<span>Recording completed</span>';
-        
-        // Re-enable data management
-        document.getElementById('clear-data-btn').disabled = false;
-        document.getElementById('export-data-btn').disabled = false;
-        
-        // Update storage usage after recording
-        this.updateStorageUsage();
-    }
-    
     showReadyState() {
         // Update UI for ready state
-        document.getElementById('start-btn').style.display = 'inline-flex';
-        document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('post-recording-controls').classList.remove('visible');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const postControls = document.getElementById('post-recording-controls');
+        
+        if (startBtn) startBtn.style.display = 'inline-flex';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (postControls) postControls.classList.remove('visible');
         
         const statusIndicator = document.getElementById('status-indicator');
-        statusIndicator.className = 'status-indicator status-idle';
-        statusIndicator.innerHTML = '<span>Ready to record</span>';
+        if (statusIndicator) {
+            statusIndicator.className = 'status-indicator status-idle';
+            statusIndicator.innerHTML = '<span>Ready to record</span>';
+        }
         
         // Ensure data management is enabled
-        document.getElementById('clear-data-btn').disabled = false;
-        document.getElementById('export-data-btn').disabled = false;
+        const clearBtn = document.getElementById('clear-data-btn');
+        const exportBtn = document.getElementById('export-data-btn');
+        if (clearBtn) clearBtn.disabled = false;
+        if (exportBtn) exportBtn.disabled = false;
     }
     
     showLoadingState(message = 'Processing...') {
@@ -308,7 +333,10 @@ export class UIManager {
         // Update performance monitor if available
         if (window.performanceMonitor) {
             if (stats.totalPoints !== undefined) {
-                document.getElementById('data-count').textContent = stats.totalPoints.toLocaleString();
+                const dataCountEl = document.getElementById('data-count');
+                if (dataCountEl) {
+                    dataCountEl.textContent = stats.totalPoints.toLocaleString();
+                }
             }
             
             if (stats.bufferSize !== undefined) {
@@ -389,4 +417,30 @@ export class UIManager {
         
         return requiredFeatures;
     }
-}
+}stopBtn) stopBtn.style.display = 'none';
+        if (postControls) postControls.classList.add('visible');
+        
+        const statusIndicator = document.getElementById('status-indicator');
+        if (statusIndicator) {
+            statusIndicator.className = 'status-indicator status-idle';
+            statusIndicator.innerHTML = '<span>Recording completed</span>';
+        }
+        
+        // Re-enable data management
+        const clearBtn = document.getElementById('clear-data-btn');
+        const exportBtn = document.getElementById('export-data-btn');
+        if (clearBtn) clearBtn.disabled = false;
+        if (exportBtn) exportBtn.disabled = false;
+        
+        // Update storage usage after recording
+        this.updateStorageUsage();
+    }
+    
+    showReadyState() {
+        // Update UI for ready state
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const postControls = document.getElementById('post-recording-controls');
+        
+        if (startBtn) startBtn.style.display = 'inline-flex';
+        if (
