@@ -1,5 +1,5 @@
 // ============================================
-// ui-manager.js - UI Management and Event Handling - Complete Fixed Version
+// ui-manager.js - UI Management and Event Handling - FIXED VERSION
 // ============================================
 
 import { showNotification } from './utils.js';
@@ -284,6 +284,26 @@ export class UIManager {
         const stopBtn = document.getElementById('stop-btn');
         const postControls = document.getElementById('post-recording-controls');
         
+        if (startBtn) startBtn.style.display = 'inline-flex';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (postControls) postControls.classList.add('visible');
+        
+        const statusIndicator = document.getElementById('status-indicator');
+        if (statusIndicator) {
+            statusIndicator.className = 'status-indicator status-idle';
+            statusIndicator.innerHTML = '<span>Recording completed</span>';
+        }
+        
+        // Re-enable data management
+        const clearBtn = document.getElementById('clear-data-btn');
+        const exportBtn = document.getElementById('export-data-btn');
+        if (clearBtn) clearBtn.disabled = false;
+        if (exportBtn) exportBtn.disabled = false;
+        
+        // Update storage usage after recording
+        this.updateStorageUsage();
+    }
+    
     showReadyState() {
         // Update UI for ready state
         const startBtn = document.getElementById('start-btn');
@@ -417,30 +437,4 @@ export class UIManager {
         
         return requiredFeatures;
     }
-}stopBtn) stopBtn.style.display = 'none';
-        if (postControls) postControls.classList.add('visible');
-        
-        const statusIndicator = document.getElementById('status-indicator');
-        if (statusIndicator) {
-            statusIndicator.className = 'status-indicator status-idle';
-            statusIndicator.innerHTML = '<span>Recording completed</span>';
-        }
-        
-        // Re-enable data management
-        const clearBtn = document.getElementById('clear-data-btn');
-        const exportBtn = document.getElementById('export-data-btn');
-        if (clearBtn) clearBtn.disabled = false;
-        if (exportBtn) exportBtn.disabled = false;
-        
-        // Update storage usage after recording
-        this.updateStorageUsage();
-    }
-    
-    showReadyState() {
-        // Update UI for ready state
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        const postControls = document.getElementById('post-recording-controls');
-        
-        if (startBtn) startBtn.style.display = 'inline-flex';
-        if (
+}
