@@ -45,6 +45,80 @@
                         Retry
                     </button>
                 </div>
+
+<!-- Add this after the permissions-grid div in your index.html -->
+<div class="permissions-actions" style="margin-top: 16px; text-align: center;">
+    <button id="request-permissions-btn" class="button button-primary" style="display: none;">
+        🔐 Request Sensor Permissions
+    </button>
+    <div id="permission-help" class="help-text" style="margin-top: 8px; display: none;">
+        On iOS devices, you need to explicitly grant motion sensor permissions.
+    </div>
+</div>
+
+<script>
+// Add permission request functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const requestBtn = document.getElementById('request-permissions-btn');
+    const helpText = document.getElementById('permission-help');
+    
+    // Show the button on iOS devices or if permissions are needed
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const needsPermissionRequest = typeof DeviceMotionEvent !== 'undefined' && 
+                                   typeof DeviceMotionEvent.requestPermission === 'function';
+    
+    if (isIOS || needsPermissionRequest) {
+        requestBtn.style.display = 'inline-flex';
+        helpText.style.display = 'block';
+        
+        requestBtn.addEventListener('click', async () => {
+            try {
+                requestBtn.textContent = 'Requesting Permissions...';
+                requestBtn.disabled = true;
+                
+                // Request motion permissions
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    console.log('Motion permission:', permission);
+                    
+                    if (permission === 'granted') {
+                        requestBtn.textContent = '✅ Permissions Granted';
+                        requestBtn.style.background = 'var(--md-sys-color-success)';
+                        
+                        // Trigger permission recheck in the app
+                        if (window.app && window.app.sensorManager) {
+                            setTimeout(() => {
+                                window.app.sensorManager.checkPermissions();
+                            }, 500);
+                        }
+                    } else {
+                        requestBtn.textContent = '❌ Permission Denied';
+                        requestBtn.style.background = 'var(--md-sys-color-error)';
+                        requestBtn.disabled = false;
+                    }
+                }
+                
+                // Also request geolocation if not already granted
+                if ('geolocation' in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        () => console.log('GPS permission granted'),
+                        () => console.log('GPS permission denied'),
+                        { enableHighAccuracy: true, timeout: 5000 }
+                    );
+                }
+                
+            } catch (error) {
+                console.error('Permission request failed:', error);
+                requestBtn.textContent = '❌ Request Failed';
+                requestBtn.style.background = 'var(--md-sys-color-error)';
+                requestBtn.disabled = false;
+            }
+        });
+    }
+});
+</script>
+
+                
             </div>
 
             <!-- Performance Monitor Section -->
