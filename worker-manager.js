@@ -110,27 +110,37 @@ export class WorkerManager {
         }
     }
     
-    downloadCSVFile(csvContent) {
-        try {
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `motion-data-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            URL.revokeObjectURL(url);
-            
-            console.log('CSV download initiated');
-            
-        } catch (error) {
-            console.error('Error downloading CSV:', error);
-            ErrorBoundary.handle(error, 'CSV Download');
-        }
+
+// Updated worker-manager.js - downloadCSVFile method
+downloadCSVFile(csvContent) {
+    try {
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        
+        // Get userID from the app
+        const userId = this.app?.userManager?.getUserId() || 'unknown';
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `motion-data-${userId}-${timestamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        URL.revokeObjectURL(url);
+        
+        console.log('CSV download initiated with filename:', a.download);
+        
+    } catch (error) {
+        console.error('Error downloading CSV:', error);
+        ErrorBoundary.handle(error, 'CSV Download');
     }
+}
+
+
+
+    
     
     terminate() {
         if (this.worker) {
