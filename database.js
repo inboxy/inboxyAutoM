@@ -1,5 +1,5 @@
 // ============================================
-// database.js - IndexedDB Management - Fixed Storage Info
+// database.js - IndexedDB Management - Complete Fixed Version
 // ============================================
 
 import { ErrorBoundary } from './utils.js';
@@ -299,11 +299,11 @@ export class DatabaseManager {
         }
     }
     
-    // Helper method to count records in a store
+    // Helper method to count records in a store - FIXED
     async getRecordCount(storeName) {
         try {
             const transaction = this.db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore('store');
+            const store = transaction.objectStore(storeName);
             
             return new Promise((resolve, reject) => {
                 const request = store.count();
