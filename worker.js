@@ -348,61 +348,56 @@ function generateCSV(data) {
             }
         }
         
-        function finishCSV() {
-            // Add summary statistics
-            const duration = data.length > 1 
-                ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
-                : 0;
-            const averageHz = duration > 0 ? data.length / duration : 0;
-            
-            // Count different data types
-            const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
-            const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
-            const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
-            
-            csvLines.push('');
-            csvLines.push('# Summary Statistics');
-            csvLines.push(`# Total Samples,${data.length}`);
-            csvLines.push(`# GPS Samples,${gpsCount}`);
-            csvLines.push(`# Accelerometer Samples,${accelCount}`);
-            csvLines.push(`# Gyroscope Samples,${gyroCount}`);
-            csvLines.push(`# Duration (seconds),${duration.toFixed(2)}`);
-            csvLines.push(`# Average Sample Rate (Hz),${averageHz.toFixed(2)}`);
-            
-            if (gpsCount > 0) {
-                csvLines.push(`# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}`);
-            }
-            if (accelCount > 0) {
-                csvLines.push(`# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}`);
-            }
-            if (gyroCount > 0) {
-                csvLines.push(`# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}`);
-            }
-            
-            const csvContent = csvLines.join('\n');
-            console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
-            
-            self.postMessage({ 
-                type: 'CSV_GENERATED', 
-                data: csvContent 
-            });
-        }
-        
-        // Start processing
-        processChunk();
-        
-    } catch (error) {
-        console.error('Worker: Error generating CSV:', error);
-        self.postMessage({
-            type: 'WORKER_ERROR',
-            data: `Failed to generate CSV: ${error.message}`
-        });
+
+
+
+// In the finishCSV function, include userID in the summary
+function finishCSV() {
+    // Add summary statistics
+    const duration = data.length > 1 
+        ? (data[data.length - 1].timestamp - data[0].timestamp) / 1000 
+        : 0;
+    const averageHz = duration > 0 ? data.length / duration : 0;
+    
+    // Get userID from the first data point
+    const userId = data.length > 0 ? data[0].userId : 'unknown';
+    
+    // Count different data types
+    const gpsCount = data.filter(d => d.gpsLat !== undefined && d.gpsLat !== null).length;
+    const accelCount = data.filter(d => d.accelX !== undefined && d.accelX !== null).length;
+    const gyroCount = data.filter(d => d.gyroAlpha !== undefined && d.gyroAlpha !== null).length;
+    
+    csvLines.push('');
+    csvLines.push('# Summary Statistics');
+    csvLines.push(`# User ID,${userId}`);
+    csvLines.push(`# Export Date,${new Date().toISOString()}`);
+    csvLines.push(`# Total Samples,${data.length}`);
+    csvLines.push(`# GPS Samples,${gpsCount}`);
+    csvLines.push(`# Accelerometer Samples,${accelCount}`);
+    csvLines.push(`# Gyroscope Samples,${gyroCount}`);
+    csvLines.push(`# Duration (seconds),${duration.toFixed(2)}`);
+    csvLines.push(`# Average Sample Rate (Hz),${averageHz.toFixed(2)}`);
+    
+    if (gpsCount > 0) {
+        csvLines.push(`# GPS Sample Rate (Hz),${(gpsCount / duration).toFixed(2)}`);
     }
+    if (accelCount > 0) {
+        csvLines.push(`# Accelerometer Sample Rate (Hz),${(accelCount / duration).toFixed(2)}`);
+    }
+    if (gyroCount > 0) {
+        csvLines.push(`# Gyroscope Sample Rate (Hz),${(gyroCount / duration).toFixed(2)}`);
+    }
+    
+    const csvContent = csvLines.join('\n');
+    console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
+    
+    // Include userID in the response so the main thread can use it for filename
+    self.postMessage({ 
+        type: 'CSV_GENERATED', 
+        data: csvContent,
+        userId: userId
+    });
 }
-
-
-
-
 
 
 
