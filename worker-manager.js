@@ -1,5 +1,5 @@
 // ============================================
-// worker-manager.js - Web Worker Management
+// worker-manager.js - Web Worker Management with UserID Support
 // ============================================
 
 import { ErrorBoundary } from './utils.js';
@@ -10,6 +10,12 @@ export class WorkerManager {
         this.onDataReceived = onDataReceived;
         this.onStatsUpdate = onStatsUpdate;
         this.isInitialized = false;
+        this.app = null; // Reference to main app for accessing userID
+    }
+    
+    // Set app reference to access userManager
+    setApp(app) {
+        this.app = app;
     }
     
     init() {
@@ -17,7 +23,7 @@ export class WorkerManager {
             this.worker = new Worker('worker.js');
             
             this.worker.addEventListener('message', (e) => {
-                const { type, data } = e.data;
+                const { type, data, userId } = e.data;
                 
                 switch(type) {
                     case 'RECORDING_STARTED':
@@ -31,7 +37,9 @@ export class WorkerManager {
                         break;
                         
                     case 'CSV_GENERATED':
-                        this.downloadCSVFile(data);
+                        // Use userID from worker response or get from app
+                        const userIdForFilename = userId || this.app?.userManager?.getUserId() || 'unknown';
+                        this.downloadCSVFile(data, userIdForFilename);
                         break;
                         
                     case 'STATS_UPDATE':
@@ -110,37 +118,30 @@ export class WorkerManager {
         }
     }
     
-
-// Updated worker-manager.js - downloadCSVFile method
-downloadCSVFile(csvContent) {
-    try {
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        
-        // Get userID from the app
-        const userId = this.app?.userManager?.getUserId() || 'unknown';
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `motion-data-${userId}-${timestamp}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        URL.revokeObjectURL(url);
-        
-        console.log('CSV download initiated with filename:', a.download);
-        
-    } catch (error) {
-        console.error('Error downloading CSV:', error);
-        ErrorBoundary.handle(error, 'CSV Download');
+    downloadCSVFile(csvContent, userId = 'unknown') {
+        try {
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create filename with userID and timestamp
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `motion-data-${userId}-${timestamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            URL.revokeObjectURL(url);
+            
+            console.log('CSV download initiated with filename:', a.download);
+            
+        } catch (error) {
+            console.error('Error downloading CSV:', error);
+            ErrorBoundary.handle(error, 'CSV Download');
+        }
     }
-}
-
-
-
-    
     
     terminate() {
         if (this.worker) {
