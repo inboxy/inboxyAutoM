@@ -18,8 +18,18 @@ class MaterialTabs {
         this.setupFloatingActionButton();
         this.setupKeyboardNavigation();
         this.setupSensorVisualizations();
+        this.startPerformanceUpdates();
         
         console.log('✅ Material3 Tabs initialized');
+    }
+    
+    startPerformanceUpdates() {
+        // Update performance metrics regularly
+        this.performanceUpdateInterval = setInterval(() => {
+            if (this.activeTab === 'performance') {
+                this.updatePerformanceMetrics();
+            }
+        }, 500); // Update every 500ms when on performance tab
     }
     
     setupTabNavigation() {
@@ -198,6 +208,9 @@ class MaterialTabs {
         
         // Set up device orientation listener
         this.setupDeviceOrientation();
+        
+        // Initialize performance chart
+        this.initPerformanceChart();
     }
     
     setupDeviceOrientation() {
@@ -282,11 +295,139 @@ class MaterialTabs {
         
         // Update timestamp for next calculation
         this.lastSensorUpdateTime = now;
+        
+        // Update performance chart if on performance tab
+        if (this.activeTab === 'performance' && this.sampleRateBuffer && this.sampleRateBuffer.length > 0) {
+            const avgRate = this.sampleRateBuffer.reduce((a, b) => a + b, 0) / this.sampleRateBuffer.length;
+            this.updatePerformanceChart(avgRate);
+        }
+    }
+    
+    initPerformanceChart() {
+        this.chartData = [];
+        this.maxChartPoints = 50; // Keep last 50 data points
+        this.chartInitialized = false;
+    }
+    
+    updatePerformanceChart(sampleRate) {
+        const chartContainer = document.getElementById('performance-monitor');
+        if (!chartContainer) return;
+        
+        // Initialize chart if not done yet
+        if (!this.chartInitialized) {
+            this.setupChart(chartContainer);
+            this.chartInitialized = true;
+        }
+        
+        // Add new data point
+        const now = Date.now();
+        this.chartData.push({
+            time: now,
+            rate: sampleRate || 0
+        });
+        
+        // Keep only the last N points
+        if (this.chartData.length > this.maxChartPoints) {
+            this.chartData.shift();
+        }
+        
+        // Redraw chart
+        this.drawChart();
+    }
+    
+    setupChart(container) {
+        container.innerHTML = `
+            <div class="chart-header">
+                <span class="chart-title">Sample Rate (Hz)</span>
+                <span class="chart-current" id="chart-current">0.0 Hz</span>
+            </div>
+            <svg class="performance-chart-svg" id="performance-svg" width="100%" height="160" viewBox="0 0 400 160">
+                <defs>
+                    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:var(--md-sys-color-primary);stop-opacity:0.8" />
+                        <stop offset="100%" style="stop-color:var(--md-sys-color-primary);stop-opacity:0.1" />
+                    </linearGradient>
+                </defs>
+                <!-- Grid lines -->
+                <g class="grid-lines">
+                    <line x1="0" y1="40" x2="400" y2="40" stroke="var(--md-sys-color-outline-variant)" stroke-width="1" stroke-dasharray="2,2"/>
+                    <line x1="0" y1="80" x2="400" y2="80" stroke="var(--md-sys-color-outline-variant)" stroke-width="1" stroke-dasharray="2,2"/>
+                    <line x1="0" y1="120" x2="400" y2="120" stroke="var(--md-sys-color-outline-variant)" stroke-width="1" stroke-dasharray="2,2"/>
+                </g>
+                <!-- Chart area -->
+                <path id="chart-area" fill="url(#chartGradient)" stroke="none"/>
+                <path id="chart-line" fill="none" stroke="var(--md-sys-color-primary)" stroke-width="2"/>
+                <!-- Y-axis labels -->
+                <text x="5" y="15" fill="var(--md-sys-color-on-surface-variant)" font-size="10">140</text>
+                <text x="5" y="45" fill="var(--md-sys-color-on-surface-variant)" font-size="10">100</text>
+                <text x="5" y="85" fill="var(--md-sys-color-on-surface-variant)" font-size="10">60</text>
+                <text x="5" y="125" fill="var(--md-sys-color-on-surface-variant)" font-size="10">20</text>
+            </svg>
+        `;
+    }
+    
+    drawChart() {
+        const svg = document.getElementById('performance-svg');
+        const chartLine = document.getElementById('chart-line');
+        const chartArea = document.getElementById('chart-area');
+        const currentDisplay = document.getElementById('chart-current');
+        
+        if (!svg || !chartLine || !chartArea || this.chartData.length < 2) return;
+        
+        const width = 400;
+        const height = 160;
+        const padding = 20;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding;
+        
+        // Scale for sample rate (0-140 Hz)
+        const maxRate = 140;
+        const minRate = 0;
+        
+        // Generate path data
+        let pathData = '';
+        let areaData = '';
+        
+        this.chartData.forEach((point, index) => {
+            const x = padding + (index / (this.maxChartPoints - 1)) * chartWidth;
+            const y = height - padding - ((point.rate - minRate) / (maxRate - minRate)) * chartHeight;
+            
+            if (index === 0) {
+                pathData = `M ${x} ${y}`;
+                areaData = `M ${x} ${height - padding} L ${x} ${y}`;
+            } else {
+                pathData += ` L ${x} ${y}`;
+                areaData += ` L ${x} ${y}`;
+            }
+        });
+        
+        // Close area path
+        if (this.chartData.length > 0) {
+            const lastIndex = this.chartData.length - 1;
+            const lastX = padding + (lastIndex / (this.maxChartPoints - 1)) * chartWidth;
+            areaData += ` L ${lastX} ${height - padding} Z`;
+        }
+        
+        // Update SVG paths
+        chartLine.setAttribute('d', pathData);
+        chartArea.setAttribute('d', areaData);
+        
+        // Update current rate display
+        if (currentDisplay && this.chartData.length > 0) {
+            const currentRate = this.chartData[this.chartData.length - 1].rate;
+            currentDisplay.textContent = `${currentRate.toFixed(1)} Hz`;
+        }
     }
     
     
     updatePerformanceMetrics() {
         if (this.activeTab !== 'performance') return;
+        
+        // Get current sample rate from the live sensor data
+        let currentSampleRate = 0;
+        if (this.sampleRateBuffer && this.sampleRateBuffer.length > 0) {
+            currentSampleRate = this.sampleRateBuffer.reduce((a, b) => a + b, 0) / this.sampleRateBuffer.length;
+        }
         
         // Get performance data from the app
         if (window.app && window.app.workerManager) {
@@ -294,16 +435,22 @@ class MaterialTabs {
             
             this.updateElement('data-count', stats.totalPoints || 0);
             this.updateElement('buffer-size', stats.bufferSize || 0);
-            this.updateElement('sample-rate', `${(stats.averageHz || 0).toFixed(1)} Hz`);
+            
+            // Use current sample rate if available, otherwise use stats
+            const displayRate = currentSampleRate > 0 ? currentSampleRate : (stats.averageHz || 0);
+            this.updateElement('sample-rate', `${displayRate.toFixed(1)} Hz`);
             
             // Update rate bar
             const rateBar = document.getElementById('rate-bar');
             const targetRate = window.MotionRecorderConfig?.sensors?.targetRate || 140;
-            const percentage = Math.min((stats.averageHz || 0) / targetRate * 100, 100);
+            const percentage = Math.min(displayRate / targetRate * 100, 100);
             
             if (rateBar) {
                 rateBar.style.width = `${percentage}%`;
             }
+            
+            // Update performance chart
+            this.updatePerformanceChart(displayRate);
         }
         
         // Update memory usage
@@ -316,6 +463,8 @@ class MaterialTabs {
         if (navigator.getBattery) {
             navigator.getBattery().then(battery => {
                 this.updateElement('battery-level', `${Math.round(battery.level * 100)}%`);
+            }).catch(() => {
+                this.updateElement('battery-level', 'N/A');
             });
         }
         
@@ -325,6 +474,8 @@ class MaterialTabs {
             const minutes = Math.floor(elapsed / 60);
             const seconds = Math.floor(elapsed % 60);
             this.updateElement('recording-time', `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        } else {
+            this.updateElement('recording-time', '00:00');
         }
     }
     
@@ -500,6 +651,13 @@ class MaterialTabs {
                     notification.remove();
                 }
             }, duration);
+        }
+    }
+    
+    // Cleanup method
+    destroy() {
+        if (this.performanceUpdateInterval) {
+            clearInterval(this.performanceUpdateInterval);
         }
     }
     
