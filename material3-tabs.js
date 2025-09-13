@@ -192,18 +192,17 @@ class MaterialTabs {
     }
     
     setupSensorVisualizations() {
-        // Initialize sensor visualization elements
-        this.accelBars = {
-            x: document.getElementById('accel-bar-x'),
-            y: document.getElementById('accel-bar-y'),
-            z: document.getElementById('accel-bar-z')
-        };
-        
-        this.compassNeedle = document.getElementById('compass-needle');
+        // Initialize sensor data tracking
+        this.sensorUpdateCount = 0;
+        this.lastSensorUpdateTime = null;
     }
     
     updateSensorData(sensorData) {
         if (this.activeTab !== 'sensors') return;
+        
+        // Track sensor updates
+        this.sensorUpdateCount++;
+        this.lastSensorUpdateTime = Date.now();
         
         // Update accelerometer data
         if (sensorData.acceleration) {
@@ -212,21 +211,27 @@ class MaterialTabs {
             this.updateElement('accel-y', y?.toFixed(2) || '0.00');
             this.updateElement('accel-z', z?.toFixed(2) || '0.00');
             
-            // Update visual bars
-            this.updateAccelBars(x || 0, y || 0, z || 0);
+            // Calculate and display magnitude
+            if (x !== null && y !== null && z !== null) {
+                const magnitude = Math.sqrt(x*x + y*y + z*z);
+                this.updateElement('accel-magnitude', magnitude.toFixed(2));
+            }
         }
         
         // Update gyroscope data
         if (sensorData.rotationRate) {
             const { alpha, beta, gamma } = sensorData.rotationRate;
-            this.updateElement('gyro-alpha', `${alpha?.toFixed(2) || '0.00'}°`);
-            this.updateElement('gyro-beta', `${beta?.toFixed(2) || '0.00'}°`);
-            this.updateElement('gyro-gamma', `${gamma?.toFixed(2) || '0.00'}°`);
-            
-            // Update compass
-            if (alpha !== null && alpha !== undefined) {
-                this.updateCompass(alpha);
-            }
+            this.updateElement('gyro-alpha', alpha?.toFixed(2) || '0.00');
+            this.updateElement('gyro-beta', beta?.toFixed(2) || '0.00');
+            this.updateElement('gyro-gamma', gamma?.toFixed(2) || '0.00');
+        }
+        
+        // Update device orientation data
+        if (sensorData.orientation) {
+            const { alpha, beta, gamma } = sensorData.orientation;
+            this.updateElement('orientation-compass', alpha ? `${alpha.toFixed(1)}°` : '--°');
+            this.updateElement('orientation-beta', beta ? `${beta.toFixed(1)}°` : '--°');
+            this.updateElement('orientation-gamma', gamma ? `${gamma.toFixed(1)}°` : '--°');
         }
         
         // Update GPS data
@@ -236,32 +241,22 @@ class MaterialTabs {
             this.updateElement('gps-lon', longitude?.toFixed(6) || '--');
             this.updateElement('gps-accuracy', accuracy ? `${accuracy.toFixed(1)} m` : '-- m');
         }
-    }
-    
-    updateAccelBars(x, y, z) {
-        const maxValue = 20; // Maximum acceleration value for scaling
         
-        if (this.accelBars.x) {
-            const percentX = Math.min(Math.abs(x) / maxValue * 100, 100);
-            this.accelBars.x.style.setProperty('--height', `${percentX}%`);
-        }
+        // Update sensor status
+        this.updateElement('live-data-count', this.sensorUpdateCount);
+        this.updateElement('last-sensor-update', new Date().toLocaleTimeString());
         
-        if (this.accelBars.y) {
-            const percentY = Math.min(Math.abs(y) / maxValue * 100, 100);
-            this.accelBars.y.style.setProperty('--height', `${percentY}%`);
-        }
-        
-        if (this.accelBars.z) {
-            const percentZ = Math.min(Math.abs(z) / maxValue * 100, 100);
-            this.accelBars.z.style.setProperty('--height', `${percentZ}%`);
+        // Update sample rate (approximate)
+        if (this.lastSensorUpdateTime) {
+            const now = Date.now();
+            const timeSinceLastUpdate = now - this.lastSensorUpdateTime;
+            if (timeSinceLastUpdate > 0) {
+                const sampleRate = 1000 / timeSinceLastUpdate;
+                this.updateElement('live-sample-rate', `${sampleRate.toFixed(1)} Hz`);
+            }
         }
     }
     
-    updateCompass(alpha) {
-        if (this.compassNeedle) {
-            this.compassNeedle.style.transform = `translate(-50%, -100%) rotate(${alpha}deg)`;
-        }
-    }
     
     updatePerformanceMetrics() {
         if (this.activeTab !== 'performance') return;

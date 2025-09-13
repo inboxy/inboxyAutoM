@@ -209,26 +209,26 @@
             <div id="sensors-panel" class="tab-panel" role="tabpanel">
                 <div class="panel-header">
                     <h2>Live Sensor Data</h2>
-                    <p class="panel-subtitle">Real-time sensor readings and visualizations</p>
+                    <p class="panel-subtitle">Real-time sensor readings optimized for mobile viewing</p>
                 </div>
 
-                <div class="sensor-data-grid">
+                <div class="sensor-data-stack">
                     <div class="sensor-card">
                         <div class="sensor-header">
                             <span class="material-icons">location_on</span>
                             <h3>GPS Location</h3>
                         </div>
-                        <div class="sensor-readings">
-                            <div class="reading">
-                                <span class="reading-label">Latitude:</span>
+                        <div class="sensor-readings-grid">
+                            <div class="reading-item">
+                                <span class="reading-label">Latitude</span>
                                 <span id="gps-lat" class="reading-value">--</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">Longitude:</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Longitude</span>
                                 <span id="gps-lon" class="reading-value">--</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">Accuracy:</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Accuracy</span>
                                 <span id="gps-accuracy" class="reading-value">-- m</span>
                             </div>
                         </div>
@@ -238,35 +238,24 @@
                         <div class="sensor-header">
                             <span class="material-icons">acceleration</span>
                             <h3>Accelerometer</h3>
+                            <div class="sensor-unit">m/s²</div>
                         </div>
-                        <div class="sensor-readings">
-                            <div class="reading">
-                                <span class="reading-label">X:</span>
+                        <div class="sensor-readings-grid">
+                            <div class="reading-item">
+                                <span class="reading-label">X-Axis</span>
                                 <span id="accel-x" class="reading-value">0.00</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">Y:</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Y-Axis</span>
                                 <span id="accel-y" class="reading-value">0.00</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">Z:</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Z-Axis</span>
                                 <span id="accel-z" class="reading-value">0.00</span>
                             </div>
-                        </div>
-                        <div class="sensor-visualization">
-                            <div class="accel-bars">
-                                <div class="bar-container">
-                                    <div id="accel-bar-x" class="sensor-bar"></div>
-                                    <label>X</label>
-                                </div>
-                                <div class="bar-container">
-                                    <div id="accel-bar-y" class="sensor-bar"></div>
-                                    <label>Y</label>
-                                </div>
-                                <div class="bar-container">
-                                    <div id="accel-bar-z" class="sensor-bar"></div>
-                                    <label>Z</label>
-                                </div>
+                            <div class="reading-item">
+                                <span class="reading-label">Magnitude</span>
+                                <span id="accel-magnitude" class="reading-value">0.00</span>
                             </div>
                         </div>
                     </div>
@@ -275,30 +264,63 @@
                         <div class="sensor-header">
                             <span class="material-icons">rotate_right</span>
                             <h3>Gyroscope</h3>
+                            <div class="sensor-unit">°/s</div>
                         </div>
-                        <div class="sensor-readings">
-                            <div class="reading">
-                                <span class="reading-label">α (Z):</span>
-                                <span id="gyro-alpha" class="reading-value">0.00°</span>
+                        <div class="sensor-readings-grid">
+                            <div class="reading-item">
+                                <span class="reading-label">Alpha (Z)</span>
+                                <span id="gyro-alpha" class="reading-value">0.00</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">β (X):</span>
-                                <span id="gyro-beta" class="reading-value">0.00°</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Beta (X)</span>
+                                <span id="gyro-beta" class="reading-value">0.00</span>
                             </div>
-                            <div class="reading">
-                                <span class="reading-label">γ (Y):</span>
-                                <span id="gyro-gamma" class="reading-value">0.00°</span>
+                            <div class="reading-item">
+                                <span class="reading-label">Gamma (Y)</span>
+                                <span id="gyro-gamma" class="reading-value">0.00</span>
                             </div>
                         </div>
-                        <div class="sensor-visualization">
-                            <div class="gyro-compass">
-                                <div id="compass-needle" class="compass-needle"></div>
-                                <div class="compass-labels">
-                                    <span class="compass-n">N</span>
-                                    <span class="compass-e">E</span>
-                                    <span class="compass-s">S</span>
-                                    <span class="compass-w">W</span>
-                                </div>
+                    </div>
+
+                    <div class="sensor-card">
+                        <div class="sensor-header">
+                            <span class="material-icons">compass_calibration</span>
+                            <h3>Device Orientation</h3>
+                            <div class="sensor-unit">degrees</div>
+                        </div>
+                        <div class="sensor-readings-grid">
+                            <div class="reading-item">
+                                <span class="reading-label">Compass</span>
+                                <span id="orientation-compass" class="reading-value">--°</span>
+                            </div>
+                            <div class="reading-item">
+                                <span class="reading-label">Tilt (Beta)</span>
+                                <span id="orientation-beta" class="reading-value">--°</span>
+                            </div>
+                            <div class="reading-item">
+                                <span class="reading-label">Roll (Gamma)</span>
+                                <span id="orientation-gamma" class="reading-value">--°</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card">
+                        <div class="sensor-header">
+                            <span class="material-icons">update</span>
+                            <h3>Sensor Status</h3>
+                        </div>
+                        <div class="sensor-readings-grid">
+                            <div class="reading-item">
+                                <span class="reading-label">Sample Rate</span>
+                                <span id="live-sample-rate" class="reading-value">-- Hz</span>
+                            </div>
+                            <div class="reading-item">
+                                <span class="reading-label">Last Update</span>
+                                <span id="last-sensor-update" class="reading-value">--</span>
+                            </div>
+                            <div class="reading-item">
+                                <span class="reading-label">Data Points</span>
+                                <span id="live-data-count" class="reading-value">0</span>
                             </div>
                         </div>
                     </div>

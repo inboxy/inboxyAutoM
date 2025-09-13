@@ -467,10 +467,11 @@ body {
     text-align: center;
 }
 
-/* Sensor Data Grid */
-.sensor-data-grid {
-    display: grid;
-    gap: 20px;
+/* Sensor Data Stack */
+.sensor-data-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     margin-bottom: 32px;
 }
 
@@ -489,13 +490,14 @@ body {
 .sensor-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
     margin-bottom: 16px;
 }
 
 .sensor-header .material-icons {
     font-size: 24px;
     color: var(--md-sys-color-primary);
+    margin-right: 12px;
 }
 
 .sensor-header h3 {
@@ -503,19 +505,33 @@ body {
     font-weight: 500;
     margin: 0;
     color: var(--md-sys-color-on-surface);
+    flex: 1;
 }
 
-.sensor-readings {
+.sensor-unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface-variant);
+    background-color: var(--md-sys-color-surface-variant);
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.sensor-readings-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
 }
 
-.reading {
+.reading-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    text-align: center;
+    padding: 12px;
+    background-color: var(--md-sys-color-surface-variant);
+    border-radius: 8px;
+    gap: 8px;
 }
 
 .reading-label {
@@ -523,101 +539,16 @@ body {
     font-weight: 500;
     color: var(--md-sys-color-on-surface-variant);
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .reading-value {
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 600;
     color: var(--md-sys-color-on-surface);
     font-family: 'Roboto Mono', monospace;
 }
 
-/* Sensor Visualizations */
-.sensor-visualization {
-    margin-top: 16px;
-}
-
-.accel-bars {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-}
-
-.bar-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.sensor-bar {
-    width: 20px;
-    height: 100px;
-    background-color: var(--md-sys-color-outline-variant);
-    border-radius: 10px;
-    position: relative;
-    overflow: hidden;
-}
-
-.sensor-bar::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: var(--md-sys-color-primary);
-    border-radius: 10px;
-    transition: height 0.1s ease;
-    height: var(--height, 50%);
-}
-
-.bar-container label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--md-sys-color-on-surface-variant);
-}
-
-.gyro-compass {
-    width: 120px;
-    height: 120px;
-    border: 2px solid var(--md-sys-color-outline);
-    border-radius: 50%;
-    position: relative;
-    margin: 0 auto;
-    background-color: var(--md-sys-color-surface-variant);
-}
-
-.compass-needle {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2px;
-    height: 40px;
-    background-color: var(--md-sys-color-error);
-    transform-origin: bottom center;
-    transform: translate(-50%, -100%) rotate(0deg);
-    transition: transform 0.2s ease;
-}
-
-.compass-labels {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
-
-.compass-labels span {
-    position: absolute;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--md-sys-color-on-surface);
-}
-
-.compass-n { top: 8px; left: 50%; transform: translateX(-50%); }
-.compass-e { right: 8px; top: 50%; transform: translateY(-50%); }
-.compass-s { bottom: 8px; left: 50%; transform: translateX(-50%); }
-.compass-w { left: 8px; top: 50%; transform: translateY(-50%); }
 
 /* Data Overview */
 .data-overview {
@@ -961,8 +892,17 @@ body {
         grid-template-columns: 1fr;
     }
     
-    .sensor-data-grid {
-        grid-template-columns: 1fr;
+    .sensor-readings-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+    }
+    
+    .reading-item {
+        padding: 8px;
+    }
+    
+    .reading-value {
+        font-size: 16px;
     }
     
     .data-overview {
