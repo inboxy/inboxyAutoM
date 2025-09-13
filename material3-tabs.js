@@ -195,6 +195,22 @@ class MaterialTabs {
         // Initialize sensor data tracking
         this.sensorUpdateCount = 0;
         this.lastSensorUpdateTime = null;
+        
+        // Set up device orientation listener
+        this.setupDeviceOrientation();
+    }
+    
+    setupDeviceOrientation() {
+        if (typeof DeviceOrientationEvent !== 'undefined') {
+            window.addEventListener('deviceorientation', (event) => {
+                if (this.activeTab === 'sensors') {
+                    const { alpha, beta, gamma } = event;
+                    this.updateElement('orientation-compass', alpha ? `${alpha.toFixed(1)}°` : '--°');
+                    this.updateElement('orientation-beta', beta ? `${beta.toFixed(1)}°` : '--°');
+                    this.updateElement('orientation-gamma', gamma ? `${gamma.toFixed(1)}°` : '--°');
+                }
+            });
+        }
     }
     
     updateSensorData(sensorData) {
@@ -202,7 +218,7 @@ class MaterialTabs {
         
         // Track sensor updates
         this.sensorUpdateCount++;
-        this.lastSensorUpdateTime = Date.now();
+        const now = Date.now();
         
         // Update accelerometer data
         if (sensorData.acceleration) {
@@ -226,19 +242,13 @@ class MaterialTabs {
             this.updateElement('gyro-gamma', gamma?.toFixed(2) || '0.00');
         }
         
-        // Update device orientation data
-        if (sensorData.orientation) {
-            const { alpha, beta, gamma } = sensorData.orientation;
-            this.updateElement('orientation-compass', alpha ? `${alpha.toFixed(1)}°` : '--°');
-            this.updateElement('orientation-beta', beta ? `${beta.toFixed(1)}°` : '--°');
-            this.updateElement('orientation-gamma', gamma ? `${gamma.toFixed(1)}°` : '--°');
-        }
         
         // Update GPS data
         if (sensorData.position) {
-            const { latitude, longitude, accuracy } = sensorData.position;
+            const { latitude, longitude, altitude, accuracy } = sensorData.position;
             this.updateElement('gps-lat', latitude?.toFixed(6) || '--');
             this.updateElement('gps-lon', longitude?.toFixed(6) || '--');
+            this.updateElement('gps-altitude', altitude ? `${altitude.toFixed(1)} m` : '-- m');
             this.updateElement('gps-accuracy', accuracy ? `${accuracy.toFixed(1)} m` : '-- m');
         }
         
@@ -246,15 +256,32 @@ class MaterialTabs {
         this.updateElement('live-data-count', this.sensorUpdateCount);
         this.updateElement('last-sensor-update', new Date().toLocaleTimeString());
         
-        // Update sample rate (approximate)
+        // Calculate and update sample rate
+        if (!this.sampleRateBuffer) {
+            this.sampleRateBuffer = [];
+        }
+        
         if (this.lastSensorUpdateTime) {
-            const now = Date.now();
             const timeSinceLastUpdate = now - this.lastSensorUpdateTime;
-            if (timeSinceLastUpdate > 0) {
-                const sampleRate = 1000 / timeSinceLastUpdate;
-                this.updateElement('live-sample-rate', `${sampleRate.toFixed(1)} Hz`);
+            if (timeSinceLastUpdate > 0 && timeSinceLastUpdate < 1000) { // Only calculate if reasonable time difference
+                const instantRate = 1000 / timeSinceLastUpdate;
+                this.sampleRateBuffer.push(instantRate);
+                
+                // Keep only last 10 samples
+                if (this.sampleRateBuffer.length > 10) {
+                    this.sampleRateBuffer.shift();
+                }
+                
+                // Calculate average
+                if (this.sampleRateBuffer.length > 2) {
+                    const avgRate = this.sampleRateBuffer.reduce((a, b) => a + b, 0) / this.sampleRateBuffer.length;
+                    this.updateElement('live-sample-rate', `${avgRate.toFixed(1)} Hz`);
+                }
             }
         }
+        
+        // Update timestamp for next calculation
+        this.lastSensorUpdateTime = now;
     }
     
     

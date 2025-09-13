@@ -490,7 +490,7 @@ body {
 .sensor-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     margin-bottom: 16px;
 }
 
@@ -515,6 +515,7 @@ body {
     background-color: var(--md-sys-color-surface-variant);
     padding: 4px 8px;
     border-radius: 12px;
+    margin-left: auto;
 }
 
 .sensor-readings-grid {
