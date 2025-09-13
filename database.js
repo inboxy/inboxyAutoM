@@ -144,7 +144,97 @@ export class DatabaseManager {
         }
     }
     
-    async getRecordings(userId = null) {
+    async getRecordings(userId = null, options = {}) {
+        try {
+            const { 
+                limit = null, 
+                offset = 0, 
+                sortBy = 'timestamp', 
+                sortOrder = 'desc' // Default to newest first for recordings
+            } = options;
+            
+            const transaction = this.db.transaction(['recordings'], 'readonly');
+            const store = transaction.objectStore('recordings');
+            
+            return new Promise((resolve, reject) => {
+                const results = [];
+                let skipCount = 0;
+                let request;
+                
+                if (userId) {
+                    const index = store.index('userId');
+                    request = index.openCursor(userId);
+                } else {
+                    request = store.openCursor();
+                }
+                
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    
+                    if (!cursor) {
+                        // Sort and resolve results
+                        const sortedResults = this._sortRecordings(results, sortBy, sortOrder);
+                        resolve(sortedResults);
+                        return;
+                    }
+                    
+                    // Handle pagination
+                    if (limit !== null) {
+                        // Skip records for offset
+                        if (skipCount < offset) {
+                            skipCount++;
+                            cursor.continue();
+                            return;
+                        }
+                        
+                        // Stop if we've reached the limit
+                        if (results.length >= limit) {
+                            const sortedResults = this._sortRecordings(results, sortBy, sortOrder);
+                            resolve(sortedResults);
+                            return;
+                        }
+                    }
+                    
+                    results.push(cursor.value);
+                    cursor.continue();
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            ErrorBoundary.handle(error, 'Get Recordings');
+            throw error;
+        }
+    }
+    
+    // Helper method to sort recordings
+    _sortRecordings(recordings, sortBy, sortOrder) {
+        if (!sortBy || recordings.length === 0) return recordings;
+        
+        return recordings.sort((a, b) => {
+            let aVal = a[sortBy];
+            let bVal = b[sortBy];
+            
+            // Handle date strings
+            if (sortBy === 'timestamp' || sortBy === 'endTime') {
+                aVal = new Date(aVal).getTime();
+                bVal = new Date(bVal).getTime();
+            }
+            
+            // Handle different data types
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+            
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+    
+    // Get total count of recordings (for pagination info)
+    async getRecordingsCount(userId = null) {
         try {
             const transaction = this.db.transaction(['recordings'], 'readonly');
             const store = transaction.objectStore('recordings');
@@ -154,33 +244,175 @@ export class DatabaseManager {
                 
                 if (userId) {
                     const index = store.index('userId');
-                    request = index.getAll(userId);
+                    request = index.count(userId);
                 } else {
-                    request = store.getAll();
+                    request = store.count();
                 }
                 
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             });
         } catch (error) {
-            ErrorBoundary.handle(error, 'Get Recordings');
+            ErrorBoundary.handle(error, 'Get Recordings Count');
             throw error;
         }
     }
     
-    async getDataPoints(recordingId) {
+    async getDataPoints(recordingId, options = {}) {
+        try {
+            const { 
+                limit = null, 
+                offset = 0, 
+                sortBy = 'timestamp', 
+                sortOrder = 'asc',
+                fields = null // Allow field selection for memory optimization
+            } = options;
+            
+            // For backwards compatibility, if no limit is specified, get all data
+            if (limit === null) {
+                return this._getAllDataPoints(recordingId);
+            }
+            
+            // Use paginated approach for better memory management
+            return this._getPaginatedDataPoints(recordingId, limit, offset, sortBy, sortOrder, fields);
+            
+        } catch (error) {
+            ErrorBoundary.handle(error, 'Get Data Points');
+            throw error;
+        }
+    }
+    
+    // Private method for getting all data points (backwards compatibility)
+    async _getAllDataPoints(recordingId) {
+        const transaction = this.db.transaction(['dataPoints'], 'readonly');
+        const store = transaction.objectStore('dataPoints');
+        const index = store.index('recordingId');
+        
+        return new Promise((resolve, reject) => {
+            const request = index.getAll(recordingId);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    // Private method for paginated data points
+    async _getPaginatedDataPoints(recordingId, limit, offset, sortBy, sortOrder, fields) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['dataPoints'], 'readonly');
+            const store = transaction.objectStore('dataPoints');
+            const index = store.index('recordingId');
+            const results = [];
+            let skipCount = 0;
+            
+            const request = index.openCursor(recordingId);
+            
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                
+                if (!cursor) {
+                    // Sort results if needed (for in-memory sorting)
+                    const sortedResults = this._sortDataPoints(results, sortBy, sortOrder);
+                    resolve(sortedResults);
+                    return;
+                }
+                
+                // Skip records for offset
+                if (skipCount < offset) {
+                    skipCount++;
+                    cursor.continue();
+                    return;
+                }
+                
+                // Stop if we've reached the limit
+                if (results.length >= limit) {
+                    const sortedResults = this._sortDataPoints(results, sortBy, sortOrder);
+                    resolve(sortedResults);
+                    return;
+                }
+                
+                // Add record to results (with field selection if specified)
+                const record = fields ? this._selectFields(cursor.value, fields) : cursor.value;
+                results.push(record);
+                
+                cursor.continue();
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    // Helper method to sort data points
+    _sortDataPoints(dataPoints, sortBy, sortOrder) {
+        if (!sortBy || dataPoints.length === 0) return dataPoints;
+        
+        return dataPoints.sort((a, b) => {
+            let aVal = a[sortBy];
+            let bVal = b[sortBy];
+            
+            // Handle different data types
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+            
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+    
+    // Helper method to select specific fields from records
+    _selectFields(record, fields) {
+        if (!fields || !Array.isArray(fields)) return record;
+        
+        const selectedRecord = {};
+        fields.forEach(field => {
+            if (record.hasOwnProperty(field)) {
+                selectedRecord[field] = record[field];
+            }
+        });
+        
+        return selectedRecord;
+    }
+    
+    // Get total count of data points for a recording (for pagination info)
+    async getDataPointsCount(recordingId) {
         try {
             const transaction = this.db.transaction(['dataPoints'], 'readonly');
             const store = transaction.objectStore('dataPoints');
             const index = store.index('recordingId');
             
             return new Promise((resolve, reject) => {
-                const request = index.getAll(recordingId);
+                const request = index.count(recordingId);
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             });
         } catch (error) {
-            ErrorBoundary.handle(error, 'Get Data Points');
+            ErrorBoundary.handle(error, 'Get Data Points Count');
+            throw error;
+        }
+    }
+    
+    // Get data points in batches for streaming/processing large datasets
+    async* getDataPointsBatch(recordingId, batchSize = 1000) {
+        try {
+            let offset = 0;
+            let batch;
+            
+            do {
+                batch = await this.getDataPoints(recordingId, {
+                    limit: batchSize,
+                    offset: offset
+                });
+                
+                if (batch.length > 0) {
+                    yield batch;
+                    offset += batch.length;
+                }
+            } while (batch.length === batchSize);
+            
+        } catch (error) {
+            ErrorBoundary.handle(error, 'Get Data Points Batch');
             throw error;
         }
     }

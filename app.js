@@ -242,23 +242,59 @@ class MotionRecorderApp {
             
             this.uiManager.showLoadingState('Generating CSV...');
             
-            // Get data from database
-            const dataPoints = await this.databaseManager.getDataPoints(this.currentRecordingId);
+            // Get total count first to check data size
+            const totalCount = await this.databaseManager.getDataPointsCount(this.currentRecordingId);
             
-            if (dataPoints.length === 0) {
+            if (totalCount === 0) {
                 this.uiManager.showNotification('No data points to export', 'warning');
                 this.uiManager.hideLoadingState();
                 return;
             }
             
-            // Generate CSV using worker
-            this.workerManager.generateCSV(dataPoints);
+            // For large datasets, use batch processing to avoid memory issues
+            if (totalCount > 10000) {
+                this.uiManager.showLoadingState(`Processing ${totalCount} data points in batches...`);
+                await this.downloadLargeCSV(this.currentRecordingId, totalCount);
+            } else {
+                // Get data from database (smaller datasets)
+                const dataPoints = await this.databaseManager.getDataPoints(this.currentRecordingId);
+                // Generate CSV using worker
+                this.workerManager.generateCSV(dataPoints);
+            }
             
             this.uiManager.hideLoadingState();
             
         } catch (error) {
             this.uiManager.hideLoadingState();
             ErrorBoundary.handle(error, 'Download CSV');
+        }
+    }
+    
+    async downloadLargeCSV(recordingId, totalCount) {
+        try {
+            const batchSize = 5000;
+            const allDataPoints = [];
+            let processed = 0;
+            
+            // Process in batches to avoid memory issues
+            for await (const batch of this.databaseManager.getDataPointsBatch(recordingId, batchSize)) {
+                allDataPoints.push(...batch);
+                processed += batch.length;
+                
+                // Update progress
+                const progress = Math.round((processed / totalCount) * 100);
+                this.uiManager.showLoadingState(`Processing batch: ${progress}% (${processed}/${totalCount})`);
+                
+                // Give browser time to breathe
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            // Generate CSV using worker
+            this.workerManager.generateCSV(allDataPoints);
+            
+        } catch (error) {
+            ErrorBoundary.handle(error, 'Download Large CSV');
+            throw error;
         }
     }
     
@@ -324,7 +360,7 @@ class MotionRecorderApp {
                 throw new Error('Database not initialized');
             }
             
-            // Get all recordings
+            // Get all recordings with basic info first
             const recordings = await this.databaseManager.getRecordings();
             
             if (recordings.length === 0) {
@@ -333,24 +369,70 @@ class MotionRecorderApp {
                 return;
             }
             
+            // Check total data size to determine export strategy
+            let totalDataPoints = 0;
+            const recordingCounts = [];
+            
+            for (const recording of recordings) {
+                const count = await this.databaseManager.getDataPointsCount(recording.id);
+                recordingCounts.push({ recordingId: recording.id, count });
+                totalDataPoints += count;
+            }
+            
             const exportData = {
                 metadata: {
                     exportDate: new Date().toISOString(),
                     userId: this.userManager.getUserId(),
                     version: '2.0.0',
-                    totalRecordings: recordings.length
+                    totalRecordings: recordings.length,
+                    totalDataPoints: totalDataPoints
                 },
                 recordings: []
             };
             
-            // Get data points for each recording
-            for (const recording of recordings) {
-                const dataPoints = await this.databaseManager.getDataPoints(recording.id);
-                exportData.recordings.push({
-                    ...recording,
-                    dataPoints: dataPoints
-                });
+            // Process recordings with progress updates
+            for (let i = 0; i < recordings.length; i++) {
+                const recording = recordings[i];
+                const recordingCount = recordingCounts[i].count;
+                
+                this.uiManager.showLoadingState(
+                    `Processing recording ${i + 1}/${recordings.length} (${recordingCount} data points)...`
+                );
+                
+                // For large recordings, use batch processing
+                if (recordingCount > 5000) {
+                    const dataPoints = [];
+                    for await (const batch of this.databaseManager.getDataPointsBatch(recording.id, 2000)) {
+                        dataPoints.push(...batch);
+                        
+                        // Update progress within large recording
+                        const progress = Math.round((dataPoints.length / recordingCount) * 100);
+                        this.uiManager.showLoadingState(
+                            `Processing recording ${i + 1}/${recordings.length}: ${progress}% (${dataPoints.length}/${recordingCount})`
+                        );
+                        
+                        // Give browser time to breathe
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    
+                    exportData.recordings.push({
+                        ...recording,
+                        dataPoints: dataPoints
+                    });
+                } else {
+                    // Smaller recordings can be processed normally
+                    const dataPoints = await this.databaseManager.getDataPoints(recording.id);
+                    exportData.recordings.push({
+                        ...recording,
+                        dataPoints: dataPoints
+                    });
+                }
+                
+                // Give browser time to breathe between recordings
+                await new Promise(resolve => setTimeout(resolve, 5));
             }
+            
+            this.uiManager.showLoadingState('Generating export file...');
             
             // Create and download file with userID in filename
             const jsonContent = JSON.stringify(exportData, null, 2);
@@ -371,9 +453,8 @@ class MotionRecorderApp {
             
             this.uiManager.hideLoadingState();
             
-            const totalDataPoints = exportData.recordings.reduce((sum, r) => sum + r.dataPoints.length, 0);
             this.uiManager.showNotification(
-                `✅ Exported ${recordings.length} recordings with ${totalDataPoints} data points`,
+                `✅ Exported ${recordings.length} recordings with ${totalDataPoints.toLocaleString()} data points`,
                 'success'
             );
             console.log('✅ Export completed with filename:', a.download);
@@ -381,6 +462,7 @@ class MotionRecorderApp {
         } catch (error) {
             this.uiManager.hideLoadingState();
             console.error('Export failed:', error);
+            ErrorBoundary.handle(error, 'Export All Data');
             this.uiManager.showNotification('❌ Export failed: ' + error.message, 'error');
         }
     }
