@@ -462,13 +462,13 @@ export class SensorManager {
         try {
             const latEl = document.getElementById('gps-lat');
             const lonEl = document.getElementById('gps-lon');
-            const errorEl = document.getElementById('gps-error');
-            const altEl = document.getElementById('gps-alt');
+            const accuracyEl = document.getElementById('gps-accuracy');
+            const altitudeEl = document.getElementById('gps-altitude');
             
             if (latEl) latEl.textContent = lat.toFixed(6);
             if (lonEl) lonEl.textContent = lon.toFixed(6);
-            if (errorEl) errorEl.textContent = `${accuracy.toFixed(1)} m`;
-            if (altEl) altEl.textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
+            if (accuracyEl) accuracyEl.textContent = `${accuracy.toFixed(1)} m`;
+            if (altitudeEl) altitudeEl.textContent = altitude ? `${altitude.toFixed(1)} m` : '-- m';
             
             console.log('📍 GPS UI updated:', { lat: lat.toFixed(6), lon: lon.toFixed(6), accuracy: accuracy.toFixed(1) });
         } catch (error) {
@@ -483,10 +483,19 @@ export class SensorManager {
             const xEl = document.getElementById('accel-x');
             const yEl = document.getElementById('accel-y');
             const zEl = document.getElementById('accel-z');
+            const magnitudeEl = document.getElementById('accel-magnitude');
             
-            if (xEl) xEl.textContent = (x !== null && x !== undefined) ? `${x.toFixed(2)} m/s²` : '-- m/s²';
-            if (yEl) yEl.textContent = (y !== null && y !== undefined) ? `${y.toFixed(2)} m/s²` : '-- m/s²';
-            if (zEl) zEl.textContent = (z !== null && z !== undefined) ? `${z.toFixed(2)} m/s²` : '-- m/s²';
+            if (xEl) xEl.textContent = (x !== null && x !== undefined) ? `${x.toFixed(2)}` : '0.00';
+            if (yEl) yEl.textContent = (y !== null && y !== undefined) ? `${y.toFixed(2)}` : '0.00';
+            if (zEl) zEl.textContent = (z !== null && z !== undefined) ? `${z.toFixed(2)}` : '0.00';
+            
+            // Calculate and display magnitude
+            if (magnitudeEl && x !== null && y !== null && z !== null) {
+                const magnitude = Math.sqrt(x*x + y*y + z*z);
+                magnitudeEl.textContent = magnitude.toFixed(2);
+            } else if (magnitudeEl) {
+                magnitudeEl.textContent = '0.00';
+            }
             
             // Log first few updates for debugging
             if (performance.now() < 5000 && x !== null && y !== null && z !== null) {
