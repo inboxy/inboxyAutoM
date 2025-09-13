@@ -101,6 +101,11 @@ class MotionRecorderApp {
                 this.performanceMonitor.addSample();
             }
         }
+        
+        // Update UI with sensor data (both recording and live view)
+        if (this.uiManager && !Array.isArray(data)) {
+            this.uiManager.updateSensorData(data);
+        }
     }
     
     async startRecording() {

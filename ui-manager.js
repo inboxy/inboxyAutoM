@@ -334,10 +334,20 @@ export class UIManager {
     }
     
     showNotification(message, type = 'info', duration = 5000) {
-        showNotification(message, type, duration);
+        if (window.materialTabs) {
+            window.materialTabs.showNotification(message, type, duration);
+        } else {
+            // Fallback to utils showNotification
+            showNotification(message, type, duration);
+        }
     }
     
     updateRecordingStats(stats) {
+        // Update Material Tabs performance metrics
+        if (window.materialTabs) {
+            window.materialTabs.updatePerformanceMetrics();
+        }
+        
         // Update performance monitor if available
         if (window.performanceMonitor) {
             if (stats.totalPoints !== undefined) {
@@ -354,6 +364,13 @@ export class UIManager {
             if (stats.averageHz !== undefined) {
                 window.performanceMonitor.updateSampleRate(stats.averageHz);
             }
+        }
+    }
+    
+    // Update sensor data display in Material Tabs
+    updateSensorData(sensorData) {
+        if (window.materialTabs) {
+            window.materialTabs.updateSensorData(sensorData);
         }
     }
     

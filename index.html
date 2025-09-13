@@ -6,780 +6,479 @@
     <title>Motion Recording PWA</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="material3-tabs.css">
     <meta name="theme-color" content="#6750A4">
     <meta name="description" content="High-frequency sensor data recording application">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjNjc1MEE0Ii8+CjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjgiIGZpbGw9IiNGRkZCRkUiLz4KPC9zdmc+Cg==">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <h2 class="card-title">Sensor Permissions</h2>
-            <div class="permissions-grid">
-                <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                    </svg>
-                    <span>GPS</span>
-                    <span id="gps-status" class="permission-status status-pending" aria-live="polite">Pending</span>
-                    <button id="gps-retry" class="retry-permission" style="display: none;" aria-label="Retry GPS permission">
-                        Retry
-                    </button>
-                </div>
-                <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                    </svg>
-                    <span>Accelerometer</span>
-                    <span id="accel-status" class="permission-status status-pending" aria-live="polite">Pending</span>
-                    <button id="accel-retry" class="retry-permission" style="display: none;" aria-label="Retry accelerometer permission">
-                        Retry
-                    </button>
-                </div>
-                <div class="permission-item">
-                    <svg class="permission-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    <span>Gyroscope</span>
-                    <span id="gyro-status" class="permission-status status-pending" aria-live="polite">Pending</span>
-                    <button id="gyro-retry" class="retry-permission" style="display: none;" aria-label="Retry gyroscope permission">
-                        Retry
-                    </button>
-                </div>
-
-<!-- Add this after the permissions-grid div in your index.html -->
-<div class="permissions-actions" style="margin-top: 16px; text-align: center;">
-    <button id="request-permissions-btn" class="button button-primary" style="display: none;">
-        🔐 Request Sensor Permissions
-    </button>
-    <div id="permission-help" class="help-text" style="margin-top: 8px; display: none;">
-        On iOS devices, you need to explicitly grant motion sensor permissions.
-    </div>
-</div>
-
-<script>
-// Add permission request functionality
-document.addEventListener('DOMContentLoaded', () => {
-    const requestBtn = document.getElementById('request-permissions-btn');
-    const helpText = document.getElementById('permission-help');
-    
-    // Show the button on iOS devices or if permissions are needed
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const needsPermissionRequest = typeof DeviceMotionEvent !== 'undefined' && 
-                                   typeof DeviceMotionEvent.requestPermission === 'function';
-    
-    if (isIOS || needsPermissionRequest) {
-        requestBtn.style.display = 'inline-flex';
-        helpText.style.display = 'block';
-        
-        requestBtn.addEventListener('click', async () => {
-            try {
-                requestBtn.textContent = 'Requesting Permissions...';
-                requestBtn.disabled = true;
-                
-                // Request motion permissions
-                if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                    const permission = await DeviceMotionEvent.requestPermission();
-                    console.log('Motion permission:', permission);
-                    
-                    if (permission === 'granted') {
-                        requestBtn.textContent = '✅ Permissions Granted';
-                        requestBtn.style.background = 'var(--md-sys-color-success)';
-                        
-                        // Trigger permission recheck in the app
-                        if (window.app && window.app.sensorManager) {
-                            setTimeout(() => {
-                                window.app.sensorManager.checkPermissions();
-                            }, 500);
-                        }
-                    } else {
-                        requestBtn.textContent = '❌ Permission Denied';
-                        requestBtn.style.background = 'var(--md-sys-color-error)';
-                        requestBtn.disabled = false;
-                    }
-                }
-                
-                // Also request geolocation if not already granted
-                if ('geolocation' in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                        () => console.log('GPS permission granted'),
-                        () => console.log('GPS permission denied'),
-                        { enableHighAccuracy: true, timeout: 5000 }
-                    );
-                }
-                
-            } catch (error) {
-                console.error('Permission request failed:', error);
-                requestBtn.textContent = '❌ Request Failed';
-                requestBtn.style.background = 'var(--md-sys-color-error)';
-                requestBtn.disabled = false;
-            }
-        });
-    }
-});
-</script>
-
-                
+    <!-- App Header -->
+    <header class="app-header">
+        <h1 class="app-title">Motion Recorder</h1>
+        <div class="app-status">
+            <div class="status-item">
+                <span class="material-icons">wifi</span>
+                <span id="online-status" class="info-value online-status online">Online</span>
             </div>
+            <div class="status-item" id="recording-indicator" style="display: none;">
+                <span class="material-icons recording-pulse">radio_button_checked</span>
+                <span>Recording</span>
+            </div>
+        </div>
+    </header>
 
-            <!-- Performance Monitor Section -->
-            <div class="card">
-                <h2 class="card-title">Performance Monitor</h2>
-                <div class="performance-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Sample Rate:</span>
-                        <span id="sample-rate" class="stat-value">-- Hz</span>
-                        <div class="rate-indicator">
-                            <div id="rate-bar" class="rate-bar"></div>
+    <!-- Material 3 Tab Navigation -->
+    <div class="tab-container">
+        <div class="tab-bar" role="tablist">
+            <button class="tab-button active" role="tab" aria-selected="true" aria-controls="permissions-panel" data-tab="permissions">
+                <span class="material-icons">security</span>
+                <span class="tab-label">Permissions</span>
+                <div class="tab-indicator"></div>
+            </button>
+            <button class="tab-button" role="tab" aria-selected="false" aria-controls="performance-panel" data-tab="performance">
+                <span class="material-icons">speed</span>
+                <span class="tab-label">Performance</span>
+                <div class="tab-indicator"></div>
+            </button>
+            <button class="tab-button" role="tab" aria-selected="false" aria-controls="sensors-panel" data-tab="sensors">
+                <span class="material-icons">sensors</span>
+                <span class="tab-label">Live Data</span>
+                <div class="tab-indicator"></div>
+            </button>
+            <button class="tab-button" role="tab" aria-selected="false" aria-controls="data-panel" data-tab="data">
+                <span class="material-icons">storage</span>
+                <span class="tab-label">Data</span>
+                <div class="tab-indicator"></div>
+            </button>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="tab-content">
+            <!-- Permissions Tab -->
+            <div id="permissions-panel" class="tab-panel active" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Sensor Permissions</h2>
+                    <p class="panel-subtitle">Grant permissions to access device sensors</p>
+                </div>
+                
+                <div class="permissions-grid">
+                    <div class="permission-card">
+                        <div class="permission-icon-container">
+                            <span class="material-icons">location_on</span>
+                        </div>
+                        <div class="permission-info">
+                            <h3>GPS Location</h3>
+                            <p>Access device location for positioning data</p>
+                        </div>
+                        <div class="permission-status-container">
+                            <span id="gps-status" class="permission-status status-pending">Pending</span>
+                            <button id="gps-retry" class="icon-button" style="display: none;" aria-label="Retry GPS permission">
+                                <span class="material-icons">refresh</span>
+                            </button>
                         </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Data Points:</span>
-                        <span id="data-count" class="stat-value">0</span>
+
+                    <div class="permission-card">
+                        <div class="permission-icon-container">
+                            <span class="material-icons">acceleration</span>
+                        </div>
+                        <div class="permission-info">
+                            <h3>Accelerometer</h3>
+                            <p>Detect device motion and acceleration</p>
+                        </div>
+                        <div class="permission-status-container">
+                            <span id="accel-status" class="permission-status status-pending">Pending</span>
+                            <button id="accel-retry" class="icon-button" style="display: none;" aria-label="Retry accelerometer permission">
+                                <span class="material-icons">refresh</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Buffer Size:</span>
-                        <span id="buffer-size" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Recording Time:</span>
-                        <span id="recording-time" class="stat-value">00:00</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Memory Usage:</span>
-                        <span id="memory-usage" class="stat-value">-- MB</span>
+
+                    <div class="permission-card">
+                        <div class="permission-icon-container">
+                            <span class="material-icons">rotate_right</span>
+                        </div>
+                        <div class="permission-info">
+                            <h3>Gyroscope</h3>
+                            <p>Measure device rotation and orientation</p>
+                        </div>
+                        <div class="permission-status-container">
+                            <span id="gyro-status" class="permission-status status-pending">Pending</span>
+                            <button id="gyro-retry" class="icon-button" style="display: none;" aria-label="Retry gyroscope permission">
+                                <span class="material-icons">refresh</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="controls">
-                <div id="status-indicator" class="status-indicator status-idle" role="status" aria-live="polite">
-                    <span>Ready to record</span>
-                </div>
-                
-                <div class="recording-controls">
-                    <button id="start-btn" class="button button-primary" aria-describedby="recording-help">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <circle cx="12" cy="12" r="10"/>
-                        </svg>
-                        START RECORDING
+
+                <div class="permissions-actions">
+                    <button id="request-permissions-btn" class="button button-primary" style="display: none;">
+                        <span class="material-icons">security</span>
+                        Request Sensor Permissions
                     </button>
-                    <button id="stop-btn" class="button button-error" style="display: none;" aria-describedby="recording-help">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <rect x="6" y="6" width="12" height="12"/>
-                        </svg>
-                        STOP RECORDING
-                    </button>
-                </div>
-                
-                <div id="recording-help" class="help-text">
-                    Recording will capture GPS location, accelerometer, and gyroscope data at high frequency.
-                </div>
-                
-                <div id="post-recording-controls" class="post-recording-controls">
-                    <button id="download-btn" class="button button-secondary" aria-describedby="download-help">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                        </svg>
-                        DOWNLOAD CSV
-                    </button>
-                    <button id="upload-btn" class="button button-secondary" aria-describedby="upload-help">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
-                        </svg>
-                        UPLOAD JSON
-                    </button>
-                </div>
-                
-                <div id="download-help" class="help-text">
-                    Download recorded data as CSV file for analysis in spreadsheet applications.
-                </div>
-                <div id="upload-help" class="help-text">
-                    Upload recorded data to server for processing and storage.
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h2 class="card-title">Live Sensor Data</h2>
-            <div class="data-display">
-                <div class="data-group" role="group" aria-labelledby="gps-heading">
-                    <div id="gps-heading" class="data-group-title">GPS</div>
-                    <div class="data-item">
-                        <span class="data-label">Latitude:</span>
-                        <span id="gps-lat" class="data-value" aria-live="polite">--</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Longitude:</span>
-                        <span id="gps-lon" class="data-value" aria-live="polite">--</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Accuracy:</span>
-                        <span id="gps-error" class="data-value" aria-live="polite">-- m</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Altitude:</span>
-                        <span id="gps-alt" class="data-value" aria-live="polite">-- m</span>
-                    </div>
-                </div>
-                
-                <div class="data-group" role="group" aria-labelledby="accel-heading">
-                    <div id="accel-heading" class="data-group-title">Accelerometer</div>
-                    <div class="data-item">
-                        <span class="data-label">X:</span>
-                        <span id="accel-x" class="data-value" aria-live="polite">-- m/s²</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Y:</span>
-                        <span id="accel-y" class="data-value" aria-live="polite">-- m/s²</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Z:</span>
-                        <span id="accel-z" class="data-value" aria-live="polite">-- m/s²</span>
-                    </div>
-                </div>
-                
-                <div class="data-group" role="group" aria-labelledby="gyro-heading">
-                    <div id="gyro-heading" class="data-group-title">Gyroscope</div>
-                    <div class="data-item">
-                        <span class="data-label">Alpha:</span>
-                        <span id="gyro-alpha" class="data-value" aria-live="polite">-- °/s</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Beta:</span>
-                        <span id="gyro-beta" class="data-value" aria-live="polite">-- °/s</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Gamma:</span>
-                        <span id="gyro-gamma" class="data-value" aria-live="polite">-- °/s</span>
+                    <div id="permission-help" class="help-text" style="display: none;">
+                        On iOS devices, you need to explicitly grant motion sensor permissions.
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="card">
-            <h2 class="card-title">Application Info</h2>
-            <div class="app-info">
-                <div class="info-item">
-                    <span class="info-label">User ID:</span>
-                    <span id="user-id" class="info-value">Loading...</span>
+
+            <!-- Performance Tab -->
+            <div id="performance-panel" class="tab-panel" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Performance Monitor</h2>
+                    <p class="panel-subtitle">Real-time performance metrics and system stats</p>
                 </div>
-                <div class="info-item">
-                    <span class="info-label">Version:</span>
-                    <span class="info-value">2.0.0</span>
+
+                <div class="metrics-grid">
+                    <div class="metric-card primary">
+                        <div class="metric-icon">
+                            <span class="material-icons">speed</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Sample Rate</h3>
+                            <div class="metric-value">
+                                <span id="sample-rate" class="value">-- Hz</span>
+                                <div class="rate-indicator">
+                                    <div id="rate-bar" class="rate-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <span class="material-icons">data_usage</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Data Points</h3>
+                            <span id="data-count" class="metric-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <span class="material-icons">memory</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Buffer Size</h3>
+                            <span id="buffer-size" class="metric-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <span class="material-icons">timer</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Recording Time</h3>
+                            <span id="recording-time" class="metric-value">00:00</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <span class="material-icons">storage</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Memory Usage</h3>
+                            <span id="memory-usage" class="metric-value">-- MB</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <span class="material-icons">battery_std</span>
+                        </div>
+                        <div class="metric-content">
+                            <h3>Battery Level</h3>
+                            <span id="battery-level" class="metric-value">100%</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="info-item">
-                    <span class="info-label">Status:</span>
-                    <span id="app-status" class="info-value">Initializing...</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Online Status:</span>
-                    <span id="online-status" class="info-value online">Online</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Storage:</span>
-                    <span id="storage-usage" class="info-value">Calculating...</span>
+
+                <div class="performance-chart">
+                    <h3>Real-time Sample Rate</h3>
+                    <div id="performance-monitor" class="chart-container">
+                        <div class="chart-placeholder">Performance chart will display during recording</div>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Data Management Controls -->
-            <div class="data-management-controls" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--md-sys-color-outline-variant);">
-                <button id="clear-data-btn" class="button button-secondary" style="width: 100%; margin-bottom: 8px;" aria-describedby="clear-data-help">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                    </svg>
-                    CLEAR ALL DATA
-                </button>
-                <button id="export-data-btn" class="button button-secondary" style="width: 100%;" aria-describedby="export-data-help">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
-                    </svg>
-                    EXPORT ALL DATA
-                </button>
-                
-                <div id="clear-data-help" class="help-text" style="margin-top: 8px;">
-                    Remove all stored recordings, data points, and reset user ID. This action cannot be undone.
+
+            <!-- Live Sensor Data Tab -->
+            <div id="sensors-panel" class="tab-panel" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Live Sensor Data</h2>
+                    <p class="panel-subtitle">Real-time sensor readings and visualizations</p>
                 </div>
-                <div id="export-data-help" class="help-text">
-                    Download all stored data as a comprehensive JSON file including all recordings and metadata.
+
+                <div class="sensor-data-grid">
+                    <div class="sensor-card">
+                        <div class="sensor-header">
+                            <span class="material-icons">location_on</span>
+                            <h3>GPS Location</h3>
+                        </div>
+                        <div class="sensor-readings">
+                            <div class="reading">
+                                <span class="reading-label">Latitude:</span>
+                                <span id="gps-lat" class="reading-value">--</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">Longitude:</span>
+                                <span id="gps-lon" class="reading-value">--</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">Accuracy:</span>
+                                <span id="gps-accuracy" class="reading-value">-- m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card">
+                        <div class="sensor-header">
+                            <span class="material-icons">acceleration</span>
+                            <h3>Accelerometer</h3>
+                        </div>
+                        <div class="sensor-readings">
+                            <div class="reading">
+                                <span class="reading-label">X:</span>
+                                <span id="accel-x" class="reading-value">0.00</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">Y:</span>
+                                <span id="accel-y" class="reading-value">0.00</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">Z:</span>
+                                <span id="accel-z" class="reading-value">0.00</span>
+                            </div>
+                        </div>
+                        <div class="sensor-visualization">
+                            <div class="accel-bars">
+                                <div class="bar-container">
+                                    <div id="accel-bar-x" class="sensor-bar"></div>
+                                    <label>X</label>
+                                </div>
+                                <div class="bar-container">
+                                    <div id="accel-bar-y" class="sensor-bar"></div>
+                                    <label>Y</label>
+                                </div>
+                                <div class="bar-container">
+                                    <div id="accel-bar-z" class="sensor-bar"></div>
+                                    <label>Z</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card">
+                        <div class="sensor-header">
+                            <span class="material-icons">rotate_right</span>
+                            <h3>Gyroscope</h3>
+                        </div>
+                        <div class="sensor-readings">
+                            <div class="reading">
+                                <span class="reading-label">α (Z):</span>
+                                <span id="gyro-alpha" class="reading-value">0.00°</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">β (X):</span>
+                                <span id="gyro-beta" class="reading-value">0.00°</span>
+                            </div>
+                            <div class="reading">
+                                <span class="reading-label">γ (Y):</span>
+                                <span id="gyro-gamma" class="reading-value">0.00°</span>
+                            </div>
+                        </div>
+                        <div class="sensor-visualization">
+                            <div class="gyro-compass">
+                                <div id="compass-needle" class="compass-needle"></div>
+                                <div class="compass-labels">
+                                    <span class="compass-n">N</span>
+                                    <span class="compass-e">E</span>
+                                    <span class="compass-s">S</span>
+                                    <span class="compass-w">W</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="privacy-notice">
-            <p><strong>Privacy Notice:</strong> This application collects location and motion sensor data for research purposes. Data is stored locally on your device and only uploaded when you explicitly choose to do so. No data is transmitted without your consent.</p>
+
+            <!-- Data Management Tab -->
+            <div id="data-panel" class="tab-panel" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Application Data</h2>
+                    <p class="panel-subtitle">Manage recordings, exports, and storage</p>
+                </div>
+
+                <div class="data-overview">
+                    <div class="overview-card">
+                        <div class="overview-icon">
+                            <span class="material-icons">folder</span>
+                        </div>
+                        <div class="overview-content">
+                            <h3>Total Recordings</h3>
+                            <span id="total-recordings" class="overview-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="overview-card">
+                        <div class="overview-icon">
+                            <span class="material-icons">storage</span>
+                        </div>
+                        <div class="overview-content">
+                            <h3>Storage Used</h3>
+                            <span id="storage-used" class="overview-value">0 MB</span>
+                        </div>
+                    </div>
+
+                    <div class="overview-card">
+                        <div class="overview-icon">
+                            <span class="material-icons">person</span>
+                        </div>
+                        <div class="overview-content">
+                            <h3>User ID</h3>
+                            <span id="user-id" class="overview-value">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-actions">
+                    <div class="action-section">
+                        <h3>Export Data</h3>
+                        <div class="action-buttons">
+                            <button id="download-btn" class="button button-secondary">
+                                <span class="material-icons">download</span>
+                                Download CSV
+                            </button>
+                            <button id="upload-btn" class="button button-secondary">
+                                <span class="material-icons">cloud_upload</span>
+                                Upload JSON
+                            </button>
+                            <button id="export-data-btn" class="button button-primary">
+                                <span class="material-icons">archive</span>
+                                Export All Data
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="action-section danger">
+                        <h3>Data Management</h3>
+                        <div class="action-buttons">
+                            <button id="clear-data-btn" class="button button-danger">
+                                <span class="material-icons">delete_forever</span>
+                                Clear All Data
+                            </button>
+                        </div>
+                        <p class="danger-warning">
+                            <span class="material-icons">warning</span>
+                            This action will permanently delete all recordings and cannot be undone.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="recordings-list" id="recordings-list">
+                    <h3>Recent Recordings</h3>
+                    <div class="recordings-container">
+                        <div class="empty-state">
+                            <span class="material-icons">folder_open</span>
+                            <p>No recordings yet. Start recording to see your data here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    
-    <!-- Notification container -->
-    <div id="notification" class="notification" role="alert" aria-live="assertive"></div>
-    
-    <!-- Loading indicator -->
-    <div id="loading" class="loading-overlay" style="display: none;">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Processing...</div>
+
+    <!-- Floating Action Button -->
+    <div class="fab-container">
+        <button id="fab-record" class="fab" aria-label="Start/Stop Recording">
+            <span class="material-icons fab-icon">radio_button_checked</span>
+            <span class="fab-text">Record</span>
+        </button>
     </div>
-    
-    <!-- Performance Monitor Styles -->
-    <style>
-        .performance-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        }
 
-        .stat-item {
-            background: var(--md-sys-color-surface);
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--md-sys-color-outline-variant);
-        }
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Processing...</p>
+        </div>
+    </div>
 
-        .stat-label {
-            display: block;
-            font-size: 12px;
-            color: var(--md-sys-color-on-surface-variant);
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    <!-- Notification Container -->
+    <div id="notification-container" class="notification-container"></div>
 
-        .stat-value {
-            display: block;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 18px;
-            font-weight: 500;
-            color: var(--md-sys-color-primary);
-        }
-
-        .rate-indicator {
-            margin-top: 8px;
-            height: 4px;
-            background: var(--md-sys-color-surface-variant);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .rate-bar {
-            height: 100%;
-            background: linear-gradient(90deg, 
-                var(--md-sys-color-error) 0%, 
-                var(--md-sys-color-warning) 50%, 
-                var(--md-sys-color-success) 100%);
-            width: 0%;
-            transition: width 200ms ease;
-        }
-
-        /* Color coding for sample rates */
-        .stat-value.rate-low { color: var(--md-sys-color-error); }
-        .stat-value.rate-medium { color: var(--md-sys-color-warning); }
-        .stat-value.rate-high { color: var(--md-sys-color-success); }
-        
-        /* Online status styling */
-        .info-value.online {
-            color: var(--md-sys-color-success);
-        }
-        
-        .info-value.offline {
-            color: var(--md-sys-color-error);
-        }
-    </style>
-
-    <!-- Performance Monitor Script -->
-    <script>
-        // Performance monitoring code
-        class PerformanceMonitor {
-            constructor() {
-                this.startTime = null;
-                this.dataCount = 0;
-                this.intervalId = null;
-                this.sampleTimes = [];
-                this.maxSamples = 100;
-            }
-            
-            start() {
-                this.startTime = Date.now();
-                this.dataCount = 0;
-                this.sampleTimes = [];
-                
-                this.intervalId = setInterval(() => {
-                    this.updateRecordingTime();
-                    this.updateMemoryUsage();
-                }, 1000);
-            }
-            
-            stop() {
-                if (this.intervalId) {
-                    clearInterval(this.intervalId);
-                    this.intervalId = null;
-                }
-            }
-            
-            addSample() {
-                const now = Date.now();
-                this.sampleTimes.push(now);
-                this.dataCount++;
-                
-                if (this.sampleTimes.length > this.maxSamples) {
-                    this.sampleTimes.shift();
-                }
-                
-                if (this.sampleTimes.length > 1) {
-                    const duration = (now - this.sampleTimes[0]) / 1000;
-                    const rate = this.sampleTimes.length / duration;
-                    this.updateSampleRate(rate);
-                }
-                
-                const dataCountEl = document.getElementById('data-count');
-                if (dataCountEl) {
-                    dataCountEl.textContent = this.dataCount.toLocaleString();
-                }
-            }
-            
-            updateSampleRate(rate) {
-                const element = document.getElementById('sample-rate');
-                const barElement = document.getElementById('rate-bar');
-                
-                if (element) {
-                    element.textContent = `${rate.toFixed(1)} Hz`;
-                    
-                    if (rate < 50) {
-                        element.className = 'stat-value rate-low';
-                    } else if (rate < 100) {
-                        element.className = 'stat-value rate-medium';
-                    } else {
-                        element.className = 'stat-value rate-high';
-                    }
-                }
-                
-                if (barElement) {
-                    const percentage = Math.min((rate / 140) * 100, 100);
-                    barElement.style.width = `${percentage}%`;
-                }
-            }
-            
-            updateRecordingTime() {
-                if (!this.startTime) return;
-                
-                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                
-                const timeEl = document.getElementById('recording-time');
-                if (timeEl) {
-                    timeEl.textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }
-            }
-            
-            updateMemoryUsage() {
-                if (performance.memory) {
-                    const mb = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
-                    const memoryEl = document.getElementById('memory-usage');
-                    if (memoryEl) {
-                        memoryEl.textContent = `${mb} MB`;
-                    }
-                }
-            }
-            
-            updateBufferSize(size) {
-                const bufferEl = document.getElementById('buffer-size');
-                if (bufferEl) {
-                    bufferEl.textContent = size.toLocaleString();
-                }
-            }
-        }
-
-        window.performanceMonitor = new PerformanceMonitor();
-    </script>
-    
-    <!-- Configuration and Scripts -->
+    <!-- Scripts -->
     <script src="config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
     
     <!-- Network Status Management -->
     <script type="module" src="network.js"></script>
     
+    <!-- Tab Management -->
+    <script src="material3-tabs.js"></script>
+    
     <!-- Main Application Module -->
     <script type="module" src="app.js"></script>
-    
-    <!-- Feature detection and fallbacks -->
-    <script>
-        // Check for required features
-        const requiredFeatures = {
-            serviceWorker: 'serviceWorker' in navigator,
-            indexedDB: 'indexedDB' in window,
-            geolocation: 'geolocation' in navigator,
-            deviceMotion: 'DeviceMotionEvent' in window,
-            webWorkers: typeof Worker !== 'undefined',
-            modules: 'noModule' in HTMLScriptElement.prototype
-        };
-        
-        // Display feature support info for debugging
-        if (window.location.search.includes('debug=true')) {
-            console.log('Feature support:', requiredFeatures);
-        }
-        
-        // Warn about missing critical features
-        const missingFeatures = Object.entries(requiredFeatures)
-            .filter(([, supported]) => !supported)
-            .map(([feature]) => feature);
-            
-        if (missingFeatures.length > 0) {
-            console.warn('Missing features:', missingFeatures);
-            
-            if (missingFeatures.includes('modules')) {
-                document.body.innerHTML = `
-                    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
-                        <h1>Browser Not Supported</h1>
-                        <p>This application requires a modern browser with ES6 module support.</p>
-                        <p>Please update your browser or try a different one.</p>
-                        <p>Missing features: ${missingFeatures.join(', ')}</p>
-                    </div>
-                `;
-            }
-        }
-        
-        // Network status monitoring is now handled by network.js
-    </script>
 
-<!-- Add this script before closing </body> tag to fix the issues -->
-<script>
-// Quick fixes for storage info and button functionality
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait for app to initialize
-    setTimeout(async () => {
-        console.log('🔧 Applying quick fixes...');
-        
-        // Fix 1: Manual storage calculation
-        async function updateStorageInfo() {
-            try {
-                const storageEl = document.getElementById('storage-usage');
-                if (!storageEl) return;
-                
-                // Try modern storage API
-                if ('storage' in navigator && 'estimate' in navigator.storage) {
-                    const estimate = await navigator.storage.estimate();
-                    const usageMB = ((estimate.usage || 0) / 1048576).toFixed(1);
-                    const quotaMB = ((estimate.quota || 0) / 1048576).toFixed(0);
-                    const percent = estimate.quota ? ((estimate.usage || 0) / estimate.quota * 100).toFixed(1) : '0';
-                    
-                    storageEl.textContent = `${usageMB} MB / ${quotaMB} MB (${percent}%)`;
-                    console.log('✅ Storage info updated');
-                } else {
-                    storageEl.textContent = 'Storage API not available';
-                }
-            } catch (error) {
-                console.warn('Storage calculation failed:', error);
-                const storageEl = document.getElementById('storage-usage');
-                if (storageEl) storageEl.textContent = 'Error calculating';
-            }
-        }
-        
-        // Fix 2: Manual clear data functionality
-        function setupClearDataButton() {
-            const clearBtn = document.getElementById('clear-data-btn');
-            if (!clearBtn) return;
+    <!-- Permissions Handler -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const requestBtn = document.getElementById('request-permissions-btn');
+            const helpText = document.getElementById('permission-help');
             
-            clearBtn.addEventListener('click', async () => {
-                const confirmed = confirm('⚠️ WARNING: This will permanently delete ALL stored data including recordings, data points, and your user ID. This cannot be undone.\n\nAre you sure you want to continue?');
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const needsPermissionRequest = typeof DeviceMotionEvent !== 'undefined' && 
+                                           typeof DeviceMotionEvent.requestPermission === 'function';
+            
+            if (isIOS || needsPermissionRequest) {
+                requestBtn.style.display = 'flex';
+                helpText.style.display = 'block';
                 
-                if (confirmed) {
+                requestBtn.addEventListener('click', async () => {
                     try {
-                        // Show loading
-                        clearBtn.textContent = 'Clearing...';
-                        clearBtn.disabled = true;
+                        requestBtn.innerHTML = '<span class="material-icons">hourglass_empty</span>Requesting...';
+                        requestBtn.disabled = true;
                         
-                        // Clear IndexedDB
-                        if (window.app && window.app.databaseManager) {
-                            await window.app.databaseManager.clearAllData();
+                        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                            const permission = await DeviceMotionEvent.requestPermission();
+                            
+                            if (permission === 'granted') {
+                                requestBtn.innerHTML = '<span class="material-icons">check_circle</span>Permissions Granted';
+                                requestBtn.classList.remove('button-primary');
+                                requestBtn.classList.add('button-success');
+                                
+                                if (window.app && window.app.sensorManager) {
+                                    setTimeout(() => window.app.sensorManager.checkPermissions(), 500);
+                                }
+                            } else {
+                                requestBtn.innerHTML = '<span class="material-icons">error</span>Permission Denied';
+                                requestBtn.classList.remove('button-primary');
+                                requestBtn.classList.add('button-danger');
+                                requestBtn.disabled = false;
+                            }
                         }
                         
-                        // Clear other storage
-                        if ('localStorage' in window) localStorage.clear();
-                        if ('sessionStorage' in window) sessionStorage.clear();
-                        
-                        // Clear cookies (regenerate user ID)
-                        if (window.app && window.app.userManager) {
-                            window.app.userManager.clearUserId();
-                            await window.app.userManager.init();
+                        if ('geolocation' in navigator) {
+                            navigator.geolocation.getCurrentPosition(
+                                () => console.log('GPS permission granted'),
+                                () => console.log('GPS permission denied'),
+                                { enableHighAccuracy: true, timeout: 5000 }
+                            );
                         }
-                        
-                        // Update UI
-                        await updateStorageInfo();
-                        
-                        clearBtn.textContent = 'CLEAR ALL DATA';
-                        clearBtn.disabled = false;
-                        
-                        alert('✅ All data cleared successfully! A new User ID has been generated.');
-                        console.log('✅ Clear data completed');
                         
                     } catch (error) {
-                        console.error('Clear data failed:', error);
-                        alert('❌ Failed to clear data: ' + error.message);
-                        clearBtn.textContent = 'CLEAR ALL DATA';
-                        clearBtn.disabled = false;
+                        console.error('Permission request failed:', error);
+                        requestBtn.innerHTML = '<span class="material-icons">error</span>Request Failed';
+                        requestBtn.classList.remove('button-primary');
+                        requestBtn.classList.add('button-danger');
+                        requestBtn.disabled = false;
                     }
-                }
-            });
-            
-            console.log('✅ Clear data button setup');
-        }
-        
-        // Fix 3: Manual export data functionality
-        function setupExportDataButton() {
-            const exportBtn = document.getElementById('export-data-btn');
-            if (!exportBtn) return;
-            
-            exportBtn.addEventListener('click', async () => {
-                try {
-                    exportBtn.textContent = 'Exporting...';
-                    exportBtn.disabled = true;
-                    
-                    if (!window.app || !window.app.databaseManager) {
-                        throw new Error('App not initialized');
-                    }
-                    
-                    // Get all recordings
-                    const recordings = await window.app.databaseManager.getRecordings();
-                    
-                    if (recordings.length === 0) {
-                        alert('No data to export. Record some data first.');
-                        exportBtn.textContent = 'EXPORT ALL DATA';
-                        exportBtn.disabled = false;
-                        return;
-                    }
-                    
-                    const exportData = {
-                        metadata: {
-                            exportDate: new Date().toISOString(),
-                            userId: window.app.userManager.getUserId(),
-                            version: '2.0.0',
-                            totalRecordings: recordings.length
-                        },
-                        recordings: []
-                    };
-                    
-                    // Get data points for each recording
-                    for (const recording of recordings) {
-                        const dataPoints = await window.app.databaseManager.getDataPoints(recording.id);
-                        exportData.recordings.push({
-                            ...recording,
-                            dataPoints: dataPoints
-                        });
-                    }
-                    
-                    // Create and download file
-                    const jsonContent = JSON.stringify(exportData, null, 2);
-                    const blob = new Blob([jsonContent], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `motion-recorder-export-${new Date().toISOString().slice(0, 10)}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    
-                    URL.revokeObjectURL(url);
-                    
-                    exportBtn.textContent = 'EXPORT ALL DATA';
-                    exportBtn.disabled = false;
-                    
-                    const totalDataPoints = exportData.recordings.reduce((sum, r) => sum + r.dataPoints.length, 0);
-                    alert(`✅ Exported ${recordings.length} recordings with ${totalDataPoints} data points`);
-                    console.log('✅ Export completed');
-                    
-                } catch (error) {
-                    console.error('Export failed:', error);
-                    alert('❌ Export failed: ' + error.message);
-                    exportBtn.textContent = 'EXPORT ALL DATA';
-                    exportBtn.disabled = false;
-                }
-            });
-            
-            console.log('✅ Export data button setup');
-        }
-        
-        // Fix 4: Create some test data for testing export
-        async function createTestDataIfNeeded() {
-            try {
-                if (!window.app || !window.app.databaseManager) return;
-                
-                const recordings = await window.app.databaseManager.getRecordings();
-                
-                if (recordings.length === 0) {
-                    console.log('Creating test data for export testing...');
-                    
-                    const userId = window.app.userManager.getUserId();
-                    const testRecording = {
-                        userId: userId,
-                        timestamp: new Date().toISOString(),
-                        status: 'completed',
-                        sampleRate: 140,
-                        batteryLevel: 1.0,
-                        endTime: new Date().toISOString(),
-                        dataPointCount: 3,
-                        averageHz: 140
-                    };
-                    
-                    const recordingId = await window.app.databaseManager.saveRecording(testRecording);
-                    
-                    const testDataPoints = [
-                        {
-                            recordingTimestamp: testRecording.timestamp,
-                            userId: userId,
-                            gpsTimestamp: new Date().toISOString(),
-                            gpsLat: 37.7749,
-                            gpsLon: -122.4194,
-                            gpsError: 5.0,
-                            timestamp: Date.now()
-                        },
-                        {
-                            recordingTimestamp: testRecording.timestamp,
-                            userId: userId,
-                            accelTimestamp: new Date().toISOString(),
-                            accelX: 0.1,
-                            accelY: 0.2,
-                            accelZ: 9.8,
-                            timestamp: Date.now()
-                        },
-                        {
-                            recordingTimestamp: testRecording.timestamp,
-                            userId: userId,
-                            gyroTimestamp: new Date().toISOString(),
-                            gyroAlpha: 1.5,
-                            gyroBeta: -0.8,
-                            gyroGamma: 0.3,
-                            timestamp: Date.now()
-                        }
-                    ];
-                    
-                    await window.app.databaseManager.saveDataPoints(testDataPoints, recordingId);
-                    console.log('✅ Test data created');
-                    
-                    // Update storage after creating data
-                    await updateStorageInfo();
-                }
-            } catch (error) {
-                console.warn('Could not create test data:', error);
+                });
             }
-        }
-        
-        // Apply all fixes
-        await updateStorageInfo();
-        setupClearDataButton();
-        setupExportDataButton();
-        await createTestDataIfNeeded();
-        
-        // Update storage info every 30 seconds
-        setInterval(updateStorageInfo, 30000);
-        
-        console.log('✅ All quick fixes applied');
-        
-    }, 3000); // Wait 3 seconds for app initialization
-});
-</script>
-    
+        });
+    </script>
 </body>
 </html>
