@@ -475,6 +475,55 @@
     <!-- Permissions Handler -->
     <script src="permissions.js"></script>
 
+    <!-- Global Error Handlers -->
+    <script type="module">
+        import { ErrorBoundary } from './utils.js';
+        
+        // Global error handler for uncaught exceptions
+        window.addEventListener('error', (event) => {
+            ErrorBoundary.handle(event.error || new Error(event.message), 'Uncaught Exception');
+        });
+        
+        // Global handler for unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            ErrorBoundary.handle(event.reason, 'Unhandled Promise Rejection');
+            // Prevent the default browser behavior (console error)
+            event.preventDefault();
+        });
+        
+        // Monitor for resource loading errors (images, scripts, etc.)
+        window.addEventListener('error', (event) => {
+            if (event.target !== window) {
+                const resource = event.target;
+                ErrorBoundary.handle(
+                    new Error(`Failed to load resource: ${resource.src || resource.href || 'unknown'}`),
+                    'Resource Loading'
+                );
+            }
+        }, true); // Use capture phase to catch resource errors
+        
+        // Performance monitoring for error patterns
+        let performanceErrorCount = 0;
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+            performanceErrorCount++;
+            
+            // Log excessive console errors
+            if (performanceErrorCount > 20) {
+                ErrorBoundary.handle(
+                    new Error('Excessive console errors detected'),
+                    'Performance Warning'
+                );
+                performanceErrorCount = 0; // Reset counter
+            }
+            
+            // Call original console.error
+            originalConsoleError.apply(console, args);
+        };
+        
+        console.log('✅ Global error handlers initialized');
+    </script>
+
     <!-- Service Worker Registration -->
     <script>
         // Register service worker for PWA functionality
@@ -500,6 +549,10 @@
                 })
                 .catch(error => {
                     console.warn('❌ Service Worker registration failed:', error);
+                    // Use ErrorBoundary if available
+                    if (window.ErrorBoundary) {
+                        window.ErrorBoundary.handle(error, 'Service Worker Registration');
+                    }
                 });
         } else {
             console.warn('⚠️ Service Workers not supported in this browser');

@@ -54,29 +54,228 @@ export function setupNanoidFallback() {
     return nanoidAvailable;
 }
 
-// Error boundary for better error handling
+// Enhanced error boundary for better error handling and recovery
 export class ErrorBoundary {
-    static handle(error, context) {
-        console.error(`Error in ${context}:`, error);
+    static errorCount = 0;
+    static maxErrors = 10;
+    static errorHistory = [];
+    
+    static handle(error, context, shouldRecover = true) {
+        this.errorCount++;
+        
+        // Log detailed error information
+        const errorInfo = {
+            message: error?.message || 'Unknown error',
+            stack: error?.stack || 'No stack trace',
+            context,
+            timestamp: new Date().toISOString(),
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
+            url: typeof window !== 'undefined' ? window.location.href : 'Unknown'
+        };
+        
+        console.error(`[ErrorBoundary] Error #${this.errorCount} in ${context}:`, errorInfo);
+        
+        // Add to error history (keep last 20 errors)
+        this.errorHistory.push(errorInfo);
+        if (this.errorHistory.length > 20) {
+            this.errorHistory.shift();
+        }
+        
+        // Check for error storm (too many errors in short time)
+        if (this.errorCount > this.maxErrors) {
+            this.handleErrorStorm();
+            return;
+        }
         
         // Show user-friendly notification
-        if (typeof window !== 'undefined' && window.app && window.app.showNotification) {
-            window.app.showNotification(`An error occurred in ${context}. Please try again.`, 'error');
-        }
+        this.showUserNotification(error, context);
         
         // Report to monitoring service if configured
         if (typeof window !== 'undefined' && window.MotionRecorderConfig?.features?.errorReporting) {
-            this.reportError(error, context);
+            this.reportError(errorInfo, context);
+        }
+        
+        // Attempt recovery if requested
+        if (shouldRecover) {
+            this.attemptRecovery(context);
         }
     }
     
-    static reportError(error, context) {
-        // Implement error reporting to your monitoring service
-        console.log('Error reported:', { 
-            error: error.message, 
-            context, 
-            timestamp: new Date().toISOString() 
-        });
+    static handleErrorStorm() {
+        console.error(`[ErrorBoundary] Error storm detected (${this.errorCount} errors). Entering safe mode.`);
+        
+        // Show critical error notification
+        this.showUserNotification(
+            new Error('Multiple errors detected. App entering safe mode.'),
+            'Error Storm',
+            'error',
+            10000
+        );
+        
+        // Disable non-essential features
+        if (typeof window !== 'undefined' && window.app) {
+            // Stop recording if active
+            if (window.app.isRecording) {
+                window.app.stopRecording();
+            }
+            
+            // Clear intervals and timeouts
+            if (window.performanceMonitor) {
+                window.performanceMonitor.stop();
+            }
+        }
+        
+        // Reset error count after 30 seconds
+        setTimeout(() => {
+            this.errorCount = 0;
+            console.log('[ErrorBoundary] Error count reset. Exiting safe mode.');
+        }, 30000);
+    }
+    
+    static showUserNotification(error, context, type = 'error', duration = 5000) {
+        // Generate user-friendly error messages
+        let userMessage = this.getUserFriendlyMessage(error, context);
+        
+        // Show notification through available channels
+        if (typeof window !== 'undefined') {
+            if (window.app && window.app.showNotification) {
+                window.app.showNotification(userMessage, type, duration);
+            } else if (window.materialTabs && window.materialTabs.showNotification) {
+                window.materialTabs.showNotification(userMessage, type, duration);
+            } else {
+                // Fallback to basic notification
+                showNotification(userMessage, type, duration);
+            }
+        }
+    }
+    
+    static getUserFriendlyMessage(error, context) {
+        // Map technical contexts to user-friendly messages
+        const contextMessages = {
+            'App Initialization': 'Failed to start the app. Please refresh the page.',
+            'Start Recording': 'Could not start recording. Please check permissions.',
+            'Stop Recording': 'Error while stopping recording. Your data may still be saved.',
+            'Save Recording Data': 'Error saving recording data. Please try again.',
+            'Download CSV': 'Could not download data. Please try again.',
+            'Upload JSON': 'Upload failed. Your data is saved locally.',
+            'Clear All Data': 'Error clearing data. Some data may remain.',
+            'Database': 'Database error. Your data might not be saved properly.',
+            'Sensor': 'Sensor error. Check device permissions.',
+            'Network': 'Network error. Working in offline mode.',
+            'Worker': 'Background processing error. Performance may be affected.'
+        };
+        
+        return contextMessages[context] || `An error occurred in ${context}. Please try again.`;
+    }
+    
+    static attemptRecovery(context) {
+        console.log(`[ErrorBoundary] Attempting recovery for context: ${context}`);
+        
+        try {
+            switch (context) {
+                case 'Sensor':
+                    // Try to reinitialize sensors
+                    if (typeof window !== 'undefined' && window.app && window.app.sensorManager) {
+                        setTimeout(() => {
+                            window.app.sensorManager.checkPermissions();
+                        }, 2000);
+                    }
+                    break;
+                    
+                case 'Database':
+                    // Try to reinitialize database
+                    if (typeof window !== 'undefined' && window.app && window.app.databaseManager) {
+                        setTimeout(() => {
+                            window.app.databaseManager.init();
+                        }, 1000);
+                    }
+                    break;
+                    
+                case 'Network':
+                    // Check network status
+                    if (typeof window !== 'undefined' && window.networkManager) {
+                        setTimeout(() => {
+                            window.networkManager.checkRealConnectivity();
+                        }, 5000);
+                    }
+                    break;
+                    
+                case 'Worker':
+                    // Try to reinitialize worker
+                    if (typeof window !== 'undefined' && window.app && window.app.workerManager) {
+                        setTimeout(() => {
+                            window.app.workerManager.terminate();
+                            window.app.workerManager.init();
+                        }, 3000);
+                    }
+                    break;
+            }
+        } catch (recoveryError) {
+            console.warn(`[ErrorBoundary] Recovery attempt failed for ${context}:`, recoveryError);
+        }
+    }
+    
+    static reportError(errorInfo, context) {
+        try {
+            // Enhanced error reporting with more context
+            const report = {
+                ...errorInfo,
+                errorCount: this.errorCount,
+                recentErrors: this.errorHistory.slice(-3), // Last 3 errors for context
+                appState: this.getAppState(),
+                deviceInfo: this.getDeviceInfo()
+            };
+            
+            console.log('[ErrorBoundary] Error report generated:', report);
+            
+            // TODO: Send to monitoring service (Sentry, LogRocket, etc.)
+            // if (window.Sentry) {
+            //     window.Sentry.captureException(error, { extra: report });
+            // }
+            
+        } catch (reportingError) {
+            console.warn('[ErrorBoundary] Failed to report error:', reportingError);
+        }
+    }
+    
+    static getAppState() {
+        if (typeof window === 'undefined' || !window.app) return null;
+        
+        return {
+            isRecording: window.app.isRecording || false,
+            currentRecordingId: window.app.currentRecordingId || null,
+            batteryLevel: window.app.batteryLevel || null,
+            activeTab: window.materialTabs?.activeTab || null
+        };
+    }
+    
+    static getDeviceInfo() {
+        if (typeof navigator === 'undefined') return null;
+        
+        return {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            cookieEnabled: navigator.cookieEnabled,
+            onLine: navigator.onLine,
+            hardwareConcurrency: navigator.hardwareConcurrency,
+            deviceMemory: navigator.deviceMemory,
+            connection: navigator.connection ? {
+                effectiveType: navigator.connection.effectiveType,
+                downlink: navigator.connection.downlink,
+                rtt: navigator.connection.rtt
+            } : null
+        };
+    }
+    
+    static getErrorHistory() {
+        return [...this.errorHistory];
+    }
+    
+    static clearErrorHistory() {
+        this.errorHistory = [];
+        this.errorCount = 0;
+        console.log('[ErrorBoundary] Error history cleared');
     }
 }
 
