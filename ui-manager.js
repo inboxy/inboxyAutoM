@@ -3,6 +3,7 @@
 // ============================================
 
 import { showNotification } from './utils.js';
+import { networkManager } from './network.js';
 
 export class UIManager {
     constructor(app) {
@@ -13,7 +14,6 @@ export class UIManager {
     init() {
         this.setupEventListeners();
         this.initNetworkMonitoring();
-        this.updateOnlineStatus();
         this.initStorageMonitoring();
     }
     
@@ -190,17 +190,12 @@ export class UIManager {
     }
     
     initNetworkMonitoring() {
-        // Monitor online/offline status
-        window.addEventListener('online', () => {
-            this.updateOnlineStatus(true);
-            // Try to upload any pending data
-            if (this.app.uploadPendingData) {
+        // Use the NetworkManager for network status monitoring
+        networkManager.onStatusChange((status, isOnline) => {
+            // Try to upload any pending data when coming online
+            if (isOnline && this.app.uploadPendingData) {
                 this.app.uploadPendingData();
             }
-        });
-        
-        window.addEventListener('offline', () => {
-            this.updateOnlineStatus(false);
         });
     }
     
@@ -247,13 +242,6 @@ export class UIManager {
         }
     }
     
-    updateOnlineStatus(isOnline = navigator.onLine) {
-        const statusEl = document.getElementById('online-status');
-        if (statusEl) {
-            statusEl.textContent = isOnline ? 'Online' : 'Offline';
-            statusEl.className = `info-value ${isOnline ? 'online' : 'offline'}`;
-        }
-    }
     
     showRecordingState() {
         // Update UI for recording state

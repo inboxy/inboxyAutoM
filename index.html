@@ -497,6 +497,9 @@ document.addEventListener('DOMContentLoaded', () => {
     <script src="config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/4.0.0/nanoid.min.js"></script>
     
+    <!-- Network Status Management -->
+    <script type="module" src="network.js"></script>
+    
     <!-- Main Application Module -->
     <script type="module" src="app.js"></script>
     
@@ -537,22 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Update online status
-        function updateOnlineStatus() {
-            const statusEl = document.getElementById('online-status');
-            if (statusEl) {
-                const isOnline = navigator.onLine;
-                statusEl.textContent = isOnline ? 'Online' : 'Offline';
-                statusEl.className = `info-value ${isOnline ? 'online' : 'offline'}`;
-            }
-        }
-        
-        // Monitor online/offline status
-        window.addEventListener('online', updateOnlineStatus);
-        window.addEventListener('offline', updateOnlineStatus);
-        
-        // Initial status check
-        document.addEventListener('DOMContentLoaded', updateOnlineStatus);
+        // Network status monitoring is now handled by network.js
     </script>
 
 <!-- Add this script before closing </body> tag to fix the issues -->
