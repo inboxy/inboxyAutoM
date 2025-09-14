@@ -616,20 +616,31 @@ body {
 }
 
 /* Circular Record Button */
-.circular-record-button {
+.record-button-container {
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 24px !important;
+    z-index: 1000 !important;
     width: 80px;
     height: 80px;
-    border-radius: 50%;
-    border: none;
-    background: #DC2626;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    font-size: 32px;
+}
+
+.circular-record-button {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    background: #DC2626 !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.3s ease !important;
+    font-size: 32px !important;
+    position: relative !important;
+    outline: none !important;
 }
 
 .circular-record-button:hover {
@@ -644,6 +655,21 @@ body {
 .circular-record-button.recording {
     background: #B91C1C;
     animation: record-pulse 1.5s infinite ease-in-out;
+}
+
+.circular-record-button .material-icons {
+    font-family: 'Material Icons' !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    font-size: 32px !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
+    color: white !important;
 }
 
 .circular-record-button.recording .material-icons {
