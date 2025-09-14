@@ -21,23 +21,52 @@ export class UIManager {
     }
     
     setupEventListeners() {
-        // Circular record button
-        const circularRecordBtn = document.getElementById('circular-record-btn');
-        if (circularRecordBtn) {
-            console.log('✅ Circular record button found, attaching event listener');
-            circularRecordBtn.addEventListener('click', () => {
-                console.log('🔴 Circular record button clicked, recording state:', this.app.isRecording);
-                if (this.app.isRecording) {
-                    console.log('⏹️ Stopping recording...');
-                    this.app.stopRecording();
-                } else {
-                    console.log('🎬 Starting recording...');
-                    this.app.startRecording();
+        console.log('🔧 Setting up event listeners...');
+
+        // Wait a bit more and try multiple times to find the button
+        const tryAttachButton = (attempts = 0) => {
+            const circularRecordBtn = document.getElementById('circular-record-btn');
+            console.log(`🔍 Attempt ${attempts + 1}: Button search result:`, circularRecordBtn);
+
+            if (circularRecordBtn) {
+                console.log('✅ Circular record button found, attaching event listener');
+                console.log('🔍 Button computed styles:', window.getComputedStyle(circularRecordBtn));
+
+                // Remove any existing listeners
+                circularRecordBtn.onclick = null;
+
+                // Add click listener
+                circularRecordBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    console.log('🔴 Circular record button clicked, recording state:', this.app.isRecording);
+                    alert('Button clicked! Recording state: ' + this.app.isRecording);
+
+                    if (this.app.isRecording) {
+                        console.log('⏹️ Stopping recording...');
+                        this.app.stopRecording();
+                    } else {
+                        console.log('🎬 Starting recording...');
+                        this.app.startRecording();
+                    }
+                }, true);
+
+                // Also add onclick as backup
+                circularRecordBtn.onclick = () => {
+                    console.log('🔴 Button onclick fired!');
+                    alert('Onclick fired!');
+                };
+
+                console.log('✅ Event listeners attached successfully');
+            } else {
+                console.error(`❌ Circular record button not found on attempt ${attempts + 1}!`);
+                if (attempts < 5) {
+                    setTimeout(() => tryAttachButton(attempts + 1), 500);
                 }
-            });
-        } else {
-            console.error('❌ Circular record button not found!');
-        }
+            }
+        };
+
+        tryAttachButton();
         
         // Data export controls
         const downloadBtn = document.getElementById('download-btn');

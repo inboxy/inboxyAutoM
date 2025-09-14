@@ -1011,3 +1011,45 @@ body {
         min-width: 60px;
     }
 }
+
+/* CIRCULAR RECORD BUTTON - CRITICAL STYLES */
+.record-button-container {
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 24px !important;
+    z-index: 9999 !important;
+    width: 80px !important;
+    height: 80px !important;
+    pointer-events: all !important;
+}
+
+.circular-record-button {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    background: #DC2626 !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.3s ease !important;
+    font-size: 24px !important;
+    position: relative !important;
+    outline: none !important;
+    pointer-events: all !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+.circular-record-button:hover {
+    transform: scale(1.1) !important;
+    background: #B91C1C !important;
+}
+
+.circular-record-button:active {
+    transform: scale(0.95) !important;
+}
