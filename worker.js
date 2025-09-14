@@ -124,7 +124,7 @@ self.addEventListener('message', function(e) {
             break;
             
         case 'GET_STATS':
-            sendStats();
+            sendStats('GET_STATS_RESPONSE');
             break;
             
         case 'CLEAR_DATA':
@@ -222,16 +222,16 @@ function addDataBatch(data) {
     }
 }
 
-function sendStats() {
+function sendStats(responseType = 'STATS_UPDATE') {
     const currentStats = {
         totalPoints: stats.totalPoints + dataBuffer.length,
         bufferSize: dataBuffer.length,
         averageHz: stats.averageRate,
         isRecording: isRecording
     };
-    
+
     self.postMessage({
-        type: 'STATS_UPDATE',
+        type: responseType,
         data: currentStats
     });
 }

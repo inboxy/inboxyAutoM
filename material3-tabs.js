@@ -382,7 +382,8 @@ class MaterialTabs {
         // Get performance data from the app
         if (window.app && window.app.workerManager) {
             const stats = window.app.workerManager.getStats?.() || {};
-            
+            console.log('📊 Material Tabs - Current stats:', stats);
+
             this.updateElement('data-count', stats.totalPoints || 0);
             this.updateElement('buffer-size', stats.bufferSize || 0);
             

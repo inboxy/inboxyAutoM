@@ -11,6 +11,7 @@ export class WorkerManager {
         this.onStatsUpdate = onStatsUpdate;
         this.isInitialized = false;
         this.app = null; // Reference to main app for accessing userID
+        this.currentStats = { totalPoints: 0, bufferSize: 0, averageHz: 0 }; // Cache for synchronous access
     }
     
     // Set app reference to access userManager
@@ -43,9 +44,17 @@ export class WorkerManager {
                         break;
                         
                     case 'STATS_UPDATE':
+                        // Update cached stats for synchronous access
+                        this.currentStats = { ...data };
                         if (this.onStatsUpdate) {
                             this.onStatsUpdate(data);
                         }
+                        break;
+
+                    case 'GET_STATS_RESPONSE':
+                        // Update cached stats when requested
+                        this.currentStats = { ...data };
+                        console.log('📊 Stats updated:', this.currentStats);
                         break;
                         
                     case 'WORKER_ERROR':
@@ -107,9 +116,12 @@ export class WorkerManager {
     }
     
     getStats() {
+        // Request fresh stats from worker (async)
         if (this.worker) {
             this.worker.postMessage({ type: 'GET_STATS' });
         }
+        // Return cached stats immediately for synchronous access
+        return this.currentStats;
     }
     
     clearData() {
