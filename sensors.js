@@ -568,11 +568,17 @@ export class SensorManager {
         const accelStatus = document.getElementById('accel-status')?.textContent.toLowerCase();
         const gyroStatus = document.getElementById('gyro-status')?.textContent.toLowerCase();
 
-        // Allow recording if permissions are granted, unsupported, or even pending (for testing)
-        const hasPermissions = (gpsStatus !== 'denied') && (accelStatus !== 'denied') && (gyroStatus !== 'denied');
+        // Allow recording if at least GPS is available, or if any sensor is not denied
+        // This allows recording even if motion sensors are not available on desktop
+        const hasGPS = (gpsStatus === 'granted');
+        const hasMotion = (accelStatus !== 'denied') || (gyroStatus !== 'denied');
+        const hasPermissions = hasGPS || hasMotion;
 
-        console.log('🔐 Permission check:', { gpsStatus, accelStatus, gyroStatus, hasPermissions });
-        
+        console.log('🔐 Permission check:', {
+            gpsStatus, accelStatus, gyroStatus,
+            hasGPS, hasMotion, hasPermissions
+        });
+
         return hasPermissions;
     }
     

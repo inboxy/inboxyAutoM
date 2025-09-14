@@ -123,13 +123,17 @@ class MotionRecorderApp {
                 return;
             }
             
+            console.log('✅ Permissions granted, starting recording process...');
             this.isRecording = true;
             this.startTime = new Date().toISOString();
-            
+            console.log('⏰ Recording start time:', this.startTime);
+
             // Adjust sample rate based on battery
             this.sensorManager.adjustSampleRateForBattery(this.batteryLevel);
-            
+            console.log('🔋 Battery level:', this.batteryLevel);
+
             // Update UI
+            console.log('🎨 Updating UI to recording state...');
             this.uiManager.showRecordingState();
             
             // Start performance monitoring
@@ -138,21 +142,26 @@ class MotionRecorderApp {
             }
             
             // Start worker recording
+            console.log('🛠️ Starting worker recording...');
             this.workerManager.startRecording();
-            
+
             // Start sensor tracking
-            this.sensorManager.startTracking(this.startTime, this.userManager.getUserId());
-            
+            const userId = this.userManager.getUserId();
+            console.log('📊 Starting sensor tracking for user:', userId);
+            this.sensorManager.startTracking(this.startTime, userId);
+
             // Create recording entry in IndexedDB
             const recording = {
-                userId: this.userManager.getUserId(),
+                userId: userId,
                 timestamp: this.startTime,
                 status: 'recording',
                 sampleRate: this.sensorManager.adaptiveSampleRate,
                 batteryLevel: this.batteryLevel
             };
-            
+
+            console.log('💾 Saving recording to database:', recording);
             this.currentRecordingId = await this.databaseManager.saveRecording(recording);
+            console.log('✅ Recording created with ID:', this.currentRecordingId);
             
             // Set maximum recording duration
             const maxDuration = window.MotionRecorderConfig?.sensors?.maxRecordingDuration || 3600000;
