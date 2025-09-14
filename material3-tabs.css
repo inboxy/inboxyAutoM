@@ -1053,3 +1053,27 @@ body {
 .circular-record-button:active {
     transform: scale(0.95) !important;
 }
+
+.circular-record-button.recording {
+    background: #B91C1C !important;
+    animation: record-pulse 1.5s infinite ease-in-out !important;
+}
+
+.circular-record-button.recording .material-icons {
+    transform: scale(0.8) !important;
+}
+
+@keyframes record-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+}

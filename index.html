@@ -418,31 +418,12 @@
     </div>
 
     <!-- Circular Record Button -->
-    <div class="record-button-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 1000; border: 2px solid yellow; background: rgba(255,0,0,0.5);">
-        <button id="circular-record-btn" class="circular-record-button" aria-label="Start Recording" style="background: red !important; width: 80px !important; height: 80px !important; border-radius: 50% !important; border: none !important; color: white !important; font-size: 24px !important; cursor: pointer !important;">
+    <div class="record-button-container">
+        <button id="circular-record-btn" class="circular-record-button" aria-label="Start Recording">
             <span class="material-icons">radio_button_checked</span>
-            REC
         </button>
     </div>
 
-    <!-- Debug Script -->
-    <script>
-        setTimeout(() => {
-            const btn = document.getElementById('circular-record-btn');
-            const container = document.querySelector('.record-button-container');
-            console.log('🔍 Button element found:', btn);
-            console.log('🔍 Container element found:', container);
-            console.log('🔍 Button styles:', btn ? window.getComputedStyle(btn) : 'No button');
-            console.log('🔍 Container styles:', container ? window.getComputedStyle(container) : 'No container');
-
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    console.log('🔴 DIRECT button click detected!');
-                    alert('Button clicked!');
-                });
-            }
-        }, 2000);
-    </script>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay" style="display: none;">

@@ -40,7 +40,6 @@ export class UIManager {
                     event.preventDefault();
                     event.stopPropagation();
                     console.log('🔴 Circular record button clicked, recording state:', this.app.isRecording);
-                    alert('Button clicked! Recording state: ' + this.app.isRecording);
 
                     if (this.app.isRecording) {
                         console.log('⏹️ Stopping recording...');
@@ -49,13 +48,7 @@ export class UIManager {
                         console.log('🎬 Starting recording...');
                         this.app.startRecording();
                     }
-                }, true);
-
-                // Also add onclick as backup
-                circularRecordBtn.onclick = () => {
-                    console.log('🔴 Button onclick fired!');
-                    alert('Onclick fired!');
-                };
+                }, false);
 
                 console.log('✅ Event listeners attached successfully');
             } else {
