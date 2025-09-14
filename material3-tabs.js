@@ -378,17 +378,21 @@ class MaterialTabs {
         if (this.sampleRateBuffer && this.sampleRateBuffer.length > 0) {
             currentSampleRate = this.sampleRateBuffer.reduce((a, b) => a + b, 0) / this.sampleRateBuffer.length;
         }
-        
+
         // Get performance data from the app
         if (window.app && window.app.workerManager) {
             const stats = window.app.workerManager.getStats?.() || {};
             console.log('📊 Material Tabs - Current stats:', stats);
+            console.log('📊 Sample rate buffer length:', this.sampleRateBuffer?.length);
+            console.log('📊 Current sample rate from buffer:', currentSampleRate);
+            console.log('📊 Average Hz from worker:', stats.averageHz);
 
             this.updateElement('data-count', stats.totalPoints || 0);
             this.updateElement('buffer-size', stats.bufferSize || 0);
-            
+
             // Use current sample rate if available, otherwise use stats
             const displayRate = currentSampleRate > 0 ? currentSampleRate : (stats.averageHz || 0);
+            console.log('📊 Final display rate:', displayRate);
             this.updateElement('sample-rate', `${displayRate.toFixed(1)} Hz`);
             
             // Update rate bar

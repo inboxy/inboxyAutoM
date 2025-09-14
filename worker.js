@@ -58,11 +58,17 @@ function flushBuffer() {
     if (stats.startTime) {
         const elapsed = (Date.now() - stats.startTime) / 1000;
         const currentRate = batchSize / (BUFFER_FLUSH_INTERVAL / 1000);
-        
+
         statsBuffer[statsIndex] = currentRate;
         statsIndex = (statsIndex + 1) % statsBuffer.length;
-        
-        stats.averageRate = stats.totalPoints / elapsed;
+
+        // Use rolling average from circular buffer instead of total elapsed time
+        const validEntries = statsBuffer.filter(rate => rate > 0);
+        stats.averageRate = validEntries.length > 0
+            ? validEntries.reduce((a, b) => a + b, 0) / validEntries.length
+            : stats.totalPoints / elapsed;
+
+        console.log('📊 Worker stats - Current rate:', currentRate, 'Average rate:', stats.averageRate, 'Valid entries:', validEntries.length);
     }
     
     // Throttle stats updates to reduce message overhead
