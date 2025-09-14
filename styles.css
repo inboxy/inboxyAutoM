@@ -617,19 +617,19 @@ body {
 
 /* Circular Record Button */
 .circular-record-button {
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     border: none;
-    background: var(--md-sys-color-error);
-    color: var(--md-sys-color-on-error);
+    background: #DC2626;
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
-    font-size: 24px;
+    font-size: 32px;
 }
 
 .circular-record-button:hover {
@@ -642,10 +642,25 @@ body {
 }
 
 .circular-record-button.recording {
-    background: var(--md-sys-color-secondary);
-    animation: pulse 2s infinite;
+    background: #B91C1C;
+    animation: record-pulse 1.5s infinite ease-in-out;
 }
 
 .circular-record-button.recording .material-icons {
     transform: scale(0.8);
+}
+
+@keyframes record-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(220, 38, 38, 0);
+    }
 }
