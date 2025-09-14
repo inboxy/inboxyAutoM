@@ -81,7 +81,7 @@
 
                     <div class="permission-card">
                         <div class="permission-icon-container">
-                            <span class="material-icons">acceleration</span>
+                            <span class="material-icons">hourglass_empty</span>
                         </div>
                         <div class="permission-info">
                             <h3>Accelerometer</h3>
@@ -240,7 +240,7 @@
 
                     <div class="sensor-card">
                         <div class="sensor-header">
-                            <span class="material-icons">acceleration</span>
+                            <span class="material-icons">hourglass_empty</span>
                             <h3>Accelerometer</h3>
                             <div class="sensor-unit">m/s²</div>
                         </div>
@@ -417,7 +417,12 @@
         </div>
     </div>
 
-
+    <!-- Circular Record Button -->
+    <div class="record-button-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 1000;">
+        <button id="circular-record-btn" class="circular-record-button" aria-label="Start Recording">
+            <span class="material-icons">radio_button_checked</span>
+        </button>
+    </div>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay" style="display: none;">

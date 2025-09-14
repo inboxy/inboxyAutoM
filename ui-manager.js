@@ -18,7 +18,17 @@ export class UIManager {
     }
     
     setupEventListeners() {
-        // Recording controls - buttons removed
+        // Circular record button
+        const circularRecordBtn = document.getElementById('circular-record-btn');
+        if (circularRecordBtn) {
+            circularRecordBtn.addEventListener('click', () => {
+                if (this.app.isRecording) {
+                    this.app.stopRecording();
+                } else {
+                    this.app.startRecording();
+                }
+            });
+        }
         
         // Data export controls
         const downloadBtn = document.getElementById('download-btn');
@@ -232,8 +242,16 @@ export class UIManager {
     showRecordingState() {
         // Update UI for recording state
         const postControls = document.getElementById('post-recording-controls');
+        const circularRecordBtn = document.getElementById('circular-record-btn');
 
         if (postControls) postControls.classList.remove('visible');
+
+        // Update circular record button
+        if (circularRecordBtn) {
+            circularRecordBtn.classList.add('recording');
+            circularRecordBtn.querySelector('.material-icons').textContent = 'stop';
+            circularRecordBtn.setAttribute('aria-label', 'Stop Recording');
+        }
 
         // Disable data management during recording
         const clearBtn = document.getElementById('clear-data-btn');
@@ -245,8 +263,16 @@ export class UIManager {
     showIdleState() {
         // Update UI for idle state
         const postControls = document.getElementById('post-recording-controls');
+        const circularRecordBtn = document.getElementById('circular-record-btn');
 
         if (postControls) postControls.classList.add('visible');
+
+        // Update circular record button
+        if (circularRecordBtn) {
+            circularRecordBtn.classList.remove('recording');
+            circularRecordBtn.querySelector('.material-icons').textContent = 'radio_button_checked';
+            circularRecordBtn.setAttribute('aria-label', 'Start Recording');
+        }
 
         // Re-enable data management
         const clearBtn = document.getElementById('clear-data-btn');
@@ -261,8 +287,16 @@ export class UIManager {
     showReadyState() {
         // Update UI for ready state
         const postControls = document.getElementById('post-recording-controls');
+        const circularRecordBtn = document.getElementById('circular-record-btn');
 
         if (postControls) postControls.classList.remove('visible');
+
+        // Update circular record button to ready state
+        if (circularRecordBtn) {
+            circularRecordBtn.classList.remove('recording');
+            circularRecordBtn.querySelector('.material-icons').textContent = 'radio_button_checked';
+            circularRecordBtn.setAttribute('aria-label', 'Start Recording');
+        }
 
         // Ensure data management is enabled
         const clearBtn = document.getElementById('clear-data-btn');

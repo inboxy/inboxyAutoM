@@ -614,3 +614,38 @@ body {
         --md-sys-color-inverse-on-surface: #322F35;
     }
 }
+
+/* Circular Record Button */
+.circular-record-button {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    background: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    font-size: 24px;
+}
+
+.circular-record-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.circular-record-button:active {
+    transform: scale(0.95);
+}
+
+.circular-record-button.recording {
+    background: var(--md-sys-color-secondary);
+    animation: pulse 2s infinite;
+}
+
+.circular-record-button.recording .material-icons {
+    transform: scale(0.8);
+}
