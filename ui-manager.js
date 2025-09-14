@@ -18,21 +18,7 @@ export class UIManager {
     }
     
     setupEventListeners() {
-        // Recording controls
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                this.app.startRecording();
-            });
-        }
-        
-        if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
-                this.app.stopRecording();
-            });
-        }
+        // Recording controls - buttons removed
         
         // Data export controls
         const downloadBtn = document.getElementById('download-btn');
@@ -245,20 +231,10 @@ export class UIManager {
     
     showRecordingState() {
         // Update UI for recording state
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
         const postControls = document.getElementById('post-recording-controls');
-        
-        if (startBtn) startBtn.style.display = 'none';
-        if (stopBtn) stopBtn.style.display = 'inline-flex';
+
         if (postControls) postControls.classList.remove('visible');
-        
-        const statusIndicator = document.getElementById('status-indicator');
-        if (statusIndicator) {
-            statusIndicator.className = 'status-indicator status-recording pulse';
-            statusIndicator.innerHTML = '<span>● Recording...</span>';
-        }
-        
+
         // Disable data management during recording
         const clearBtn = document.getElementById('clear-data-btn');
         const exportBtn = document.getElementById('export-data-btn');
@@ -268,46 +244,26 @@ export class UIManager {
     
     showIdleState() {
         // Update UI for idle state
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
         const postControls = document.getElementById('post-recording-controls');
-        
-        if (startBtn) startBtn.style.display = 'inline-flex';
-        if (stopBtn) stopBtn.style.display = 'none';
+
         if (postControls) postControls.classList.add('visible');
-        
-        const statusIndicator = document.getElementById('status-indicator');
-        if (statusIndicator) {
-            statusIndicator.className = 'status-indicator status-idle';
-            statusIndicator.innerHTML = '<span>Recording completed</span>';
-        }
-        
+
         // Re-enable data management
         const clearBtn = document.getElementById('clear-data-btn');
         const exportBtn = document.getElementById('export-data-btn');
         if (clearBtn) clearBtn.disabled = false;
         if (exportBtn) exportBtn.disabled = false;
-        
+
         // Update storage usage after recording
         this.updateStorageUsage();
     }
     
     showReadyState() {
         // Update UI for ready state
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
         const postControls = document.getElementById('post-recording-controls');
-        
-        if (startBtn) startBtn.style.display = 'inline-flex';
-        if (stopBtn) stopBtn.style.display = 'none';
+
         if (postControls) postControls.classList.remove('visible');
-        
-        const statusIndicator = document.getElementById('status-indicator');
-        if (statusIndicator) {
-            statusIndicator.className = 'status-indicator status-idle';
-            statusIndicator.innerHTML = '<span>Ready to record</span>';
-        }
-        
+
         // Ensure data management is enabled
         const clearBtn = document.getElementById('clear-data-btn');
         const exportBtn = document.getElementById('export-data-btn');

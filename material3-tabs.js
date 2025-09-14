@@ -15,7 +15,6 @@ class MaterialTabs {
     
     init() {
         this.setupTabNavigation();
-        this.setupFloatingActionButton();
         this.setupKeyboardNavigation();
         this.setupSensorVisualizations();
         this.startPerformanceUpdates();
@@ -106,57 +105,13 @@ class MaterialTabs {
         this.updateRecordingsList();
     }
     
-    setupFloatingActionButton() {
-        this.fab = document.getElementById('fab-record');
-        
-        if (this.fab) {
-            this.fab.addEventListener('click', () => {
-                this.toggleRecording();
-            });
-        }
-    }
     
-    toggleRecording() {
-        if (window.app) {
-            if (this.isRecording) {
-                this.stopRecording();
-            } else {
-                this.startRecording();
-            }
-        }
-    }
     
-    startRecording() {
-        if (window.app && window.app.startRecording) {
-            window.app.startRecording();
-            this.setRecordingState(true);
-        }
-    }
     
-    stopRecording() {
-        if (window.app && window.app.stopRecording) {
-            window.app.stopRecording();
-            this.setRecordingState(false);
-        }
-    }
     
     setRecordingState(recording) {
         this.isRecording = recording;
-        
-        if (this.fab) {
-            if (recording) {
-                this.fab.classList.add('recording');
-                this.fab.querySelector('.fab-icon').textContent = 'stop';
-                this.fab.querySelector('.fab-text').textContent = 'Stop';
-                this.fab.setAttribute('aria-label', 'Stop Recording');
-            } else {
-                this.fab.classList.remove('recording');
-                this.fab.querySelector('.fab-icon').textContent = 'radio_button_checked';
-                this.fab.querySelector('.fab-text').textContent = 'Record';
-                this.fab.setAttribute('aria-label', 'Start Recording');
-            }
-        }
-        
+
         // Update recording indicator in header
         const indicator = document.getElementById('recording-indicator');
         if (indicator) {
@@ -193,11 +148,6 @@ class MaterialTabs {
                 this.switchTab(this.tabButtons[newIndex].dataset.tab);
             }
             
-            // Space bar to toggle recording
-            if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                this.toggleRecording();
-            }
         });
     }
     
