@@ -29,6 +29,7 @@ class MotionRecorderApp {
         this.startTime = null;
         this.currentRecordingId = null;
         this.batteryLevel = 1;
+        this.statsInterval = null;
         
         // Performance monitoring
         this.performanceMonitor = null;
@@ -166,6 +167,15 @@ class MotionRecorderApp {
             // Set maximum recording duration
             const maxDuration = window.MotionRecorderConfig?.sensors?.maxRecordingDuration || 3600000;
             this.uiManager.setMaxRecordingDuration(maxDuration);
+
+            // Start periodic stats updates
+            this.statsInterval = setInterval(() => {
+                this.workerManager.getStats();
+                // Also trigger Material Tabs performance metrics update
+                if (window.materialTabs) {
+                    window.materialTabs.updatePerformanceMetrics();
+                }
+            }, 1000); // Update every second
             
         } catch (error) {
             ErrorBoundary.handle(error, 'Start Recording');
@@ -177,9 +187,15 @@ class MotionRecorderApp {
     async stopRecording() {
         try {
             this.isRecording = false;
-            
+
             // Clear recording timeout
             this.uiManager.clearRecordingTimeout();
+
+            // Clear stats interval
+            if (this.statsInterval) {
+                clearInterval(this.statsInterval);
+                this.statsInterval = null;
+            }
             
             // Stop performance monitoring
             if (this.performanceMonitor) {

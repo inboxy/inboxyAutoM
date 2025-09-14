@@ -308,6 +308,11 @@ export class UIManager {
             header.classList.add('recording');
         }
 
+        // Update Material Tabs recording state
+        if (window.materialTabs) {
+            window.materialTabs.setRecordingState(true);
+        }
+
         // Update circular record button
         if (circularRecordBtn) {
             circularRecordBtn.classList.add('recording');
@@ -333,6 +338,11 @@ export class UIManager {
         // Reset header background
         if (header) {
             header.classList.remove('recording');
+        }
+
+        // Update Material Tabs recording state
+        if (window.materialTabs) {
+            window.materialTabs.setRecordingState(false);
         }
 
         // Update circular record button
