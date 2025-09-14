@@ -243,8 +243,14 @@ export class UIManager {
         // Update UI for recording state
         const postControls = document.getElementById('post-recording-controls');
         const circularRecordBtn = document.getElementById('circular-record-btn');
+        const header = document.querySelector('.app-header');
 
         if (postControls) postControls.classList.remove('visible');
+
+        // Update header background
+        if (header) {
+            header.classList.add('recording');
+        }
 
         // Update circular record button
         if (circularRecordBtn) {
@@ -264,8 +270,14 @@ export class UIManager {
         // Update UI for idle state
         const postControls = document.getElementById('post-recording-controls');
         const circularRecordBtn = document.getElementById('circular-record-btn');
+        const header = document.querySelector('.app-header');
 
         if (postControls) postControls.classList.add('visible');
+
+        // Reset header background
+        if (header) {
+            header.classList.remove('recording');
+        }
 
         // Update circular record button
         if (circularRecordBtn) {
@@ -288,8 +300,14 @@ export class UIManager {
         // Update UI for ready state
         const postControls = document.getElementById('post-recording-controls');
         const circularRecordBtn = document.getElementById('circular-record-btn');
+        const header = document.querySelector('.app-header');
 
         if (postControls) postControls.classList.remove('visible');
+
+        // Reset header background to normal
+        if (header) {
+            header.classList.remove('recording');
+        }
 
         // Update circular record button to ready state
         if (circularRecordBtn) {
