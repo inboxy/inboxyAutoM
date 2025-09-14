@@ -523,10 +523,17 @@ class MotionRecorderApp {
 // Initialize the application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        console.log('🚀 Initializing Motion Recorder App...');
         window.app = new MotionRecorderApp();
-        console.log('Motion Recorder App initialized successfully');
+        console.log('✅ Motion Recorder App initialized successfully');
+        console.log('🔍 Global app object:', window.app);
+        console.log('🔍 App methods:', {
+            startRecording: typeof window.app.startRecording,
+            stopRecording: typeof window.app.stopRecording,
+            isRecording: window.app.isRecording
+        });
     } catch (error) {
-        console.error('Failed to initialize Motion Recorder App:', error);
+        console.error('❌ Failed to initialize Motion Recorder App:', error);
         ErrorBoundary.handle(error, 'App Initialization');
     }
 });

@@ -35,20 +35,45 @@ export class UIManager {
                 // Remove any existing listeners
                 circularRecordBtn.onclick = null;
 
-                // Add click listener
-                circularRecordBtn.addEventListener('click', (event) => {
+                // Add click listener with explicit binding
+                const clickHandler = (event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    console.log('🔴 Circular record button clicked, recording state:', this.app.isRecording);
+                    console.log('🔴 Circular record button clicked!');
+                    console.log('🔍 UIManager context:', this);
+                    console.log('🔍 App object:', this.app);
+                    console.log('🔍 Recording state:', this.app?.isRecording);
+                    console.log('🔍 App methods available:', {
+                        startRecording: typeof this.app?.startRecording,
+                        stopRecording: typeof this.app?.stopRecording
+                    });
 
-                    if (this.app.isRecording) {
-                        console.log('⏹️ Stopping recording...');
-                        this.app.stopRecording();
-                    } else {
-                        console.log('🎬 Starting recording...');
-                        this.app.startRecording();
+                    if (!this.app) {
+                        console.error('❌ App object not available!');
+                        console.error('❌ Trying to access global app:', window.app);
+                        // Fallback to global app
+                        if (window.app) {
+                            console.log('✅ Using global app as fallback');
+                            this.app = window.app;
+                        } else {
+                            return;
+                        }
                     }
-                }, false);
+
+                    try {
+                        if (this.app.isRecording) {
+                            console.log('⏹️ Stopping recording...');
+                            this.app.stopRecording();
+                        } else {
+                            console.log('🎬 Starting recording...');
+                            this.app.startRecording();
+                        }
+                    } catch (error) {
+                        console.error('❌ Error during recording operation:', error);
+                    }
+                };
+
+                circularRecordBtn.addEventListener('click', clickHandler.bind(this), false);
 
                 console.log('✅ Event listeners attached successfully');
             } else {
