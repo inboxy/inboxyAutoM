@@ -341,7 +341,7 @@ export class UIManager {
         }
     }
     
-    showNotification(message, type = 'info', duration = 5000) {
+    showNotification(message, type = 'info', duration = 8000) {
         if (window.materialTabs) {
             window.materialTabs.showNotification(message, type, duration);
         } else {

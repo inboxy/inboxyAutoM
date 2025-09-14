@@ -280,7 +280,7 @@ export class ErrorBoundary {
 }
 
 // Notification utility
-export function showNotification(message, type = 'info', duration = 5000) {
+export function showNotification(message, type = 'info', duration = 8000) {
     if (typeof document === 'undefined') return;
     
     const notification = document.getElementById('notification');

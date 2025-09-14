@@ -556,7 +556,7 @@ class MaterialTabs {
         }
     }
     
-    showNotification(message, type = 'info', duration = 5000) {
+    showNotification(message, type = 'info', duration = 8000) {
         const container = document.getElementById('notification-container');
         if (!container) return;
         
@@ -596,11 +596,17 @@ class MaterialTabs {
         container.appendChild(notification);
         
         if (duration > 0) {
+            // Extend duration for error and warning notifications
+            let adjustedDuration = duration;
+            if (type === 'error' || type === 'warning') {
+                adjustedDuration = Math.max(duration, 10000); // At least 10 seconds for errors/warnings
+            }
+
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.remove();
                 }
-            }, duration);
+            }, adjustedDuration);
         }
     }
     
