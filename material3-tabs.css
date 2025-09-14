@@ -108,20 +108,22 @@ body {
 }
 
 .app-header.recording {
-    background-color: #DC2626;
-    border-bottom-color: #B91C1C;
+    background-color: #DC2626 !important;
+    background: #DC2626 !important;
+    border-bottom-color: #B91C1C !important;
+    transition: background-color 0.3s ease !important;
 }
 
 .app-header.recording .app-title {
-    color: white;
+    color: white !important;
 }
 
 .app-header.recording .app-status .status-item {
-    color: white;
+    color: white !important;
 }
 
 .app-header.recording .app-status .material-icons {
-    color: white;
+    color: white !important;
 }
 
 .app-title {

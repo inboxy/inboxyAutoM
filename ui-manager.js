@@ -305,7 +305,12 @@ export class UIManager {
 
         // Update header background
         if (header) {
+            console.log('🎨 Adding recording class to header:', header);
             header.classList.add('recording');
+            console.log('🎨 Header classes after adding recording:', header.classList.toString());
+            console.log('🎨 Header computed style:', window.getComputedStyle(header).backgroundColor);
+        } else {
+            console.error('❌ Header element not found!');
         }
 
         // Update Material Tabs recording state
@@ -337,7 +342,12 @@ export class UIManager {
 
         // Reset header background
         if (header) {
+            console.log('🎨 Removing recording class from header:', header);
             header.classList.remove('recording');
+            console.log('🎨 Header classes after removing recording:', header.classList.toString());
+            console.log('🎨 Header computed style:', window.getComputedStyle(header).backgroundColor);
+        } else {
+            console.error('❌ Header element not found in idle state!');
         }
 
         // Update Material Tabs recording state
