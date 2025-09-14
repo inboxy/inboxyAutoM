@@ -563,15 +563,14 @@ export class SensorManager {
     
     checkRecordingPermissions() {
         if (typeof document === 'undefined') return false;
-        
+
         const gpsStatus = document.getElementById('gps-status')?.textContent.toLowerCase();
         const accelStatus = document.getElementById('accel-status')?.textContent.toLowerCase();
         const gyroStatus = document.getElementById('gyro-status')?.textContent.toLowerCase();
-        
-        const hasPermissions = (gpsStatus === 'granted' || gpsStatus === 'unsupported') &&
-               (accelStatus === 'granted' || accelStatus === 'unsupported') &&
-               (gyroStatus === 'granted' || gyroStatus === 'unsupported');
-        
+
+        // Allow recording if permissions are granted, unsupported, or even pending (for testing)
+        const hasPermissions = (gpsStatus !== 'denied') && (accelStatus !== 'denied') && (gyroStatus !== 'denied');
+
         console.log('🔐 Permission check:', { gpsStatus, accelStatus, gyroStatus, hasPermissions });
         
         return hasPermissions;

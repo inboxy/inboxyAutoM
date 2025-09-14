@@ -110,11 +110,14 @@ class MotionRecorderApp {
     
     async startRecording() {
         try {
+            console.log('🎬 startRecording called');
             // Check if we have necessary permissions
             const hasPermissions = this.sensorManager.checkRecordingPermissions();
+            console.log('📋 Permissions check result:', hasPermissions);
             if (!hasPermissions) {
+                console.log('❌ Permissions denied, showing notification');
                 this.uiManager.showNotification(
-                    'Please grant sensor permissions before recording', 
+                    'Please grant sensor permissions before recording',
                     'warning'
                 );
                 return;

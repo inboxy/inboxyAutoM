@@ -12,7 +12,10 @@ export class UIManager {
     }
     
     init() {
-        this.setupEventListeners();
+        // Use setTimeout to ensure DOM is fully ready
+        setTimeout(() => {
+            this.setupEventListeners();
+        }, 100);
         this.initNetworkMonitoring();
         this.initStorageMonitoring();
     }
@@ -21,13 +24,19 @@ export class UIManager {
         // Circular record button
         const circularRecordBtn = document.getElementById('circular-record-btn');
         if (circularRecordBtn) {
+            console.log('✅ Circular record button found, attaching event listener');
             circularRecordBtn.addEventListener('click', () => {
+                console.log('🔴 Circular record button clicked, recording state:', this.app.isRecording);
                 if (this.app.isRecording) {
+                    console.log('⏹️ Stopping recording...');
                     this.app.stopRecording();
                 } else {
+                    console.log('🎬 Starting recording...');
                     this.app.startRecording();
                 }
             });
+        } else {
+            console.error('❌ Circular record button not found!');
         }
         
         // Data export controls
