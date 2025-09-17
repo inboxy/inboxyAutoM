@@ -422,6 +422,20 @@ class MaterialTabs {
                 this.updateElement('battery-level', 'N/A');
             });
         }
+
+        // Update wake lock status
+        if (window.wakeLockManager) {
+            const wakeLockStatus = window.wakeLockManager.getStatus();
+            let statusText = 'Inactive';
+
+            if (!wakeLockStatus.supported) {
+                statusText = 'Not Supported';
+            } else if (wakeLockStatus.active) {
+                statusText = 'Active';
+            }
+
+            this.updateElement('wake-lock-status', statusText);
+        }
         
         // Update recording time
         if (this.isRecording && window.app?.startTime) {

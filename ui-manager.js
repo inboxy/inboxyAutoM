@@ -4,6 +4,7 @@
 
 import { showNotification } from './utils.js';
 import { networkManager } from './network.js';
+import { wakeLockManager } from './wake-lock-manager.js';
 
 export class UIManager {
     constructor(app) {
@@ -18,6 +19,7 @@ export class UIManager {
         }, 100);
         this.initNetworkMonitoring();
         this.initStorageMonitoring();
+        this.initWakeLockMonitoring();
     }
     
     setupEventListeners() {
@@ -293,8 +295,21 @@ export class UIManager {
             }
         }
     }
-    
-    
+
+    initWakeLockMonitoring() {
+        // Monitor wake lock status changes
+        wakeLockManager.onStatusChange((statusInfo) => {
+            console.log('🔋 Wake lock status changed:', statusInfo);
+
+            // Show user feedback for wake lock status
+            if (statusInfo.status === 'error' || statusInfo.status === 'unsupported') {
+                this.showNotification(statusInfo.message, 'warning', 6000);
+            } else if (statusInfo.status === 'active') {
+                this.showNotification(statusInfo.message, 'info', 3000);
+            }
+        });
+    }
+
     showRecordingState() {
         // Update UI for recording state
         const postControls = document.getElementById('post-recording-controls');
@@ -324,6 +339,9 @@ export class UIManager {
             circularRecordBtn.querySelector('.material-icons').textContent = 'stop';
             circularRecordBtn.setAttribute('aria-label', 'Stop Recording');
         }
+
+        // Request wake lock to keep screen active during recording
+        wakeLockManager.requestWakeLock();
 
         // Disable data management during recording
         const clearBtn = document.getElementById('clear-data-btn');
@@ -362,6 +380,9 @@ export class UIManager {
             circularRecordBtn.setAttribute('aria-label', 'Start Recording');
         }
 
+        // Release wake lock when recording stops
+        wakeLockManager.releaseWakeLock();
+
         // Re-enable data management
         const clearBtn = document.getElementById('clear-data-btn');
         const exportBtn = document.getElementById('export-data-btn');
@@ -391,6 +412,9 @@ export class UIManager {
             circularRecordBtn.querySelector('.material-icons').textContent = 'radio_button_checked';
             circularRecordBtn.setAttribute('aria-label', 'Start Recording');
         }
+
+        // Release wake lock if any
+        wakeLockManager.releaseWakeLock();
 
         // Ensure data management is enabled
         const clearBtn = document.getElementById('clear-data-btn');
