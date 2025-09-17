@@ -52,8 +52,8 @@ export class NetworkManager {
             console.warn('⚠️ Network Information API not supported');
         }
 
-        // Initial status update
-        this.updateStatus();
+        // Test actual connectivity before setting initial status
+        this.checkInitialConnectivity();
 
         console.log('✅ NetworkManager initialized');
         return true;
@@ -92,6 +92,32 @@ export class NetworkManager {
             rtt: this.connection.rtt || 0,
             saveData: this.connection.saveData || false
         };
+    }
+
+    // Check initial connectivity more thoroughly on page load
+    async checkInitialConnectivity() {
+        // If navigator says we're offline, respect that immediately
+        if (!navigator.onLine) {
+            this.isOnline = false;
+            this.updateStatus();
+            return;
+        }
+
+        // If navigator says online, test actual connectivity
+        try {
+            const isActuallyOnline = await this.testConnectivity();
+            this.isOnline = isActuallyOnline;
+            this.updateStatus();
+
+            if (!isActuallyOnline) {
+                console.log('📴 Browser reports online but connectivity test failed - showing offline');
+            }
+        } catch (error) {
+            // If connectivity test fails, assume offline
+            this.isOnline = false;
+            this.updateStatus();
+            console.warn('Initial connectivity test failed, showing offline:', error.message);
+        }
     }
     
     updateStatus() {
