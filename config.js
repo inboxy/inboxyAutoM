@@ -17,7 +17,9 @@ window.MotionRecorderConfig = {
         targetRate: 140, // Target 140Hz for high-frequency sampling
         fallbackRate: 60, // Fallback rate for devices that can't handle 140Hz
         adaptiveRateEnabled: true, // Automatically adjust based on device capability
-        gpsUpdateInterval: 1000, // GPS updates every second
+        gpsUpdateInterval: 100, // GPS updates every 100ms (10Hz target)
+        gpsMaxAge: 100, // Maximum age of GPS data in ms (force fresh reads)
+        gpsTimeout: 5000, // GPS timeout in ms
         maxRecordingDuration: 3600000, // 1 hour in milliseconds
         dataValidation: true,
         maxBufferSize: 5000, // Maximum data points before forced flush

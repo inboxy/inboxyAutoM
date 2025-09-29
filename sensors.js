@@ -235,10 +235,14 @@ export class SensorManager {
             navigator.geolocation.clearWatch(this.watchId);
         }
         
+        // Get GPS config from window config or use defaults
+        const gpsMaxAge = window.MotionRecorderConfig?.sensors?.gpsMaxAge || 100;
+        const gpsTimeout = window.MotionRecorderConfig?.sensors?.gpsTimeout || 5000;
+
         const options = {
             enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 2000
+            timeout: gpsTimeout,
+            maximumAge: gpsMaxAge  // Force fresh GPS readings more frequently
         };
         
         this.watchId = navigator.geolocation.watchPosition(
