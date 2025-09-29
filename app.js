@@ -218,6 +218,14 @@ class MotionRecorderApp {
     
     async saveRecordingData(data, stats) {
         try {
+            console.log('💾 saveRecordingData called:', {
+                hasCurrentRecordingId: !!this.currentRecordingId,
+                dataType: typeof data,
+                isArray: Array.isArray(data),
+                dataLength: data?.length,
+                statsAvgHz: stats?.averageHz
+            });
+
             if (!this.currentRecordingId) return;
 
             // Update recording status
@@ -534,8 +542,15 @@ class MotionRecorderApp {
     
     async uploadCSVToServer(data) {
         try {
+            console.log('📤 uploadCSVToServer called with data:', {
+                dataType: typeof data,
+                isArray: Array.isArray(data),
+                length: data?.length,
+                sample: data?.[0]
+            });
+
             if (!data || data.length === 0) {
-                console.log('No data to upload');
+                console.log('❌ No data to upload - data is empty or undefined');
                 return;
             }
 
