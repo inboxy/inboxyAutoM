@@ -196,21 +196,21 @@ class MotionRecorderApp {
                 clearInterval(this.statsInterval);
                 this.statsInterval = null;
             }
-            
+
             // Stop performance monitoring
             if (this.performanceMonitor) {
                 this.performanceMonitor.stop();
             }
-            
+
             // Stop sensor tracking
             this.sensorManager.stopTracking();
-            
+
             // Update UI
             this.uiManager.showIdleState();
-            
-            // Stop worker recording
+
+            // Stop worker recording - this will trigger automatic upload
             this.workerManager.stopRecording();
-            
+
         } catch (error) {
             ErrorBoundary.handle(error, 'Stop Recording');
         }
@@ -219,7 +219,7 @@ class MotionRecorderApp {
     async saveRecordingData(data, stats) {
         try {
             if (!this.currentRecordingId) return;
-            
+
             // Update recording status
             await this.databaseManager.updateRecording(this.currentRecordingId, {
                 status: 'completed',
@@ -227,7 +227,7 @@ class MotionRecorderApp {
                 dataPointCount: data.length,
                 averageHz: stats?.averageHz || 0
             });
-            
+
             // Save performance metrics
             if (stats) {
                 await this.databaseManager.savePerformanceMetrics({
@@ -237,21 +237,24 @@ class MotionRecorderApp {
                     timestamp: new Date().toISOString()
                 });
             }
-            
+
             // Save data points in chunks to avoid memory issues
             await this.databaseManager.saveDataPoints(data, this.currentRecordingId);
-            
+
             console.log('Recording saved successfully:', {
                 recordingId: this.currentRecordingId,
                 dataPoints: data.length,
                 averageHz: stats?.averageHz
             });
-            
+
             this.uiManager.showNotification(
                 `Recording saved: ${data.length} data points at ${(stats?.averageHz || 0).toFixed(1)} Hz`,
                 'success'
             );
-            
+
+            // Automatically upload CSV to server
+            await this.uploadCSVToServer(data);
+
         } catch (error) {
             ErrorBoundary.handle(error, 'Save Recording Data');
         }
@@ -529,6 +532,84 @@ class MotionRecorderApp {
         }
     }
     
+    async uploadCSVToServer(data) {
+        try {
+            if (!data || data.length === 0) {
+                console.log('No data to upload');
+                return;
+            }
+
+            this.uiManager.showNotification('Uploading recording to server...', 'info');
+
+            // Generate CSV content using worker
+            const csvContent = await this.generateCSVContent(data);
+
+            // Get user ID
+            const userId = this.userManager.getUserId();
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            const filename = `motion-data-${userId}-${timestamp}.csv`;
+
+            // Upload to server
+            const uploadEndpoint = 'https://autom-store-worker.inboxy.workers.dev/';
+
+            const formData = new FormData();
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            formData.append('file', blob, filename);
+            formData.append('userId', userId);
+            formData.append('dataPoints', data.length.toString());
+
+            const response = await fetch(uploadEndpoint, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('CSV uploaded successfully:', result);
+                this.uiManager.showNotification(
+                    `✅ Recording uploaded successfully (${data.length} points)`,
+                    'success'
+                );
+            } else {
+                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+            }
+
+        } catch (error) {
+            console.error('Failed to upload CSV:', error);
+            ErrorBoundary.handle(error, 'Upload CSV to Server');
+            this.uiManager.showNotification(
+                '⚠️ Upload failed. Data saved locally.',
+                'warning'
+            );
+        }
+    }
+
+    async generateCSVContent(data) {
+        return new Promise((resolve, reject) => {
+            // Create a temporary message handler
+            const handleMessage = (e) => {
+                if (e.data.type === 'CSV_GENERATED') {
+                    this.workerManager.worker.removeEventListener('message', handleMessage);
+                    resolve(e.data.data);
+                } else if (e.data.type === 'WORKER_ERROR') {
+                    this.workerManager.worker.removeEventListener('message', handleMessage);
+                    reject(new Error(e.data.data));
+                }
+            };
+
+            this.workerManager.worker.addEventListener('message', handleMessage);
+
+            // Request CSV generation
+            this.workerManager.generateCSV(data);
+
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                this.workerManager.worker.removeEventListener('message', handleMessage);
+                reject(new Error('CSV generation timed out'));
+            }, 30000);
+        });
+    }
+
     async uploadPendingData() {
         try {
             // This would be called when connection is restored
@@ -538,7 +619,7 @@ class MotionRecorderApp {
             console.warn('Failed to upload pending data:', error);
         }
     }
-    
+
     // Expose methods for UI callbacks
     showNotification(message, type, duration) {
         this.uiManager.showNotification(message, type, duration);
