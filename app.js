@@ -574,10 +574,13 @@ class MotionRecorderApp {
 
     async generateCSVContent(data) {
         return new Promise((resolve, reject) => {
+            console.log('🔨 Generating CSV content for upload (no download)');
+
             // Create a temporary message handler
             const handleMessage = (e) => {
                 if (e.data.type === 'CSV_GENERATED') {
                     this.workerManager.worker.removeEventListener('message', handleMessage);
+                    console.log('✅ CSV generated, returning content without download');
                     resolve(e.data.data);
                 } else if (e.data.type === 'WORKER_ERROR') {
                     this.workerManager.worker.removeEventListener('message', handleMessage);
@@ -587,8 +590,12 @@ class MotionRecorderApp {
 
             this.workerManager.worker.addEventListener('message', handleMessage);
 
-            // Request CSV generation
-            this.workerManager.generateCSV(data);
+            // Request CSV generation directly from worker with skipDownload flag
+            this.workerManager.worker.postMessage({
+                type: 'GENERATE_CSV',
+                data: data,
+                skipDownload: true  // Don't trigger automatic download
+            });
 
             // Timeout after 30 seconds
             setTimeout(() => {

@@ -106,27 +106,27 @@ function updateStatistics() {
 
 // Main message handler from the main thread
 self.addEventListener('message', function(e) {
-    const { type, data } = e.data;
-    
+    const { type, data, skipDownload } = e.data;
+
     switch(type) {
         case 'START_RECORDING':
             startRecording();
             break;
-            
+
         case 'STOP_RECORDING':
             stopRecording();
             break;
-            
+
         case 'ADD_DATA_POINT':
             addDataPoint(data);
             break;
-            
+
         case 'ADD_DATA_BATCH':
             addDataBatch(data);
             break;
-            
+
         case 'GENERATE_CSV':
-            generateCSV(data);
+            generateCSV(data, skipDownload);
             break;
             
         case 'GET_STATS':
@@ -260,9 +260,9 @@ function clearData() {
 }
 
 // Optimized CSV generation with streaming approach
-function generateCSV(data) {
+function generateCSV(data, skipDownload = false) {
     try {
-        console.log('Worker: Generating CSV for', data.length, 'data points');
+        console.log('Worker: Generating CSV for', data.length, 'data points', skipDownload ? '(for upload, no download)' : '(for download)');
         
         // Updated headers with Recording Session Start column removed
         const headers = [
@@ -391,12 +391,13 @@ function generateCSV(data) {
             
             const csvContent = csvLines.join('\n');
             console.log('Worker: CSV generated -', data.length, 'points,', averageHz.toFixed(2), 'Hz avg');
-            
-            // Include userID in the response so the main thread can use it for filename
-            self.postMessage({ 
-                type: 'CSV_GENERATED', 
+
+            // Include userID and skipDownload flag in the response
+            self.postMessage({
+                type: 'CSV_GENERATED',
                 data: csvContent,
-                userId: userId
+                userId: userId,
+                skipDownload: skipDownload
             });
         }
         

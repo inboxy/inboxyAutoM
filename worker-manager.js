@@ -24,23 +24,26 @@ export class WorkerManager {
             this.worker = new Worker('worker.js');
             
             this.worker.addEventListener('message', (e) => {
-                const { type, data, userId } = e.data;
-                
+                const { type, data, userId, skipDownload } = e.data;
+
                 switch(type) {
                     case 'RECORDING_STARTED':
                         console.log('Worker: Recording started');
                         break;
-                        
+
                     case 'RECORDING_STOPPED':
                         if (this.onDataReceived) {
                             this.onDataReceived(data.data, data.stats);
                         }
                         break;
-                        
+
                     case 'CSV_GENERATED':
-                        // Use userID from worker response or get from app
-                        const userIdForFilename = userId || this.app?.userManager?.getUserId() || 'unknown';
-                        this.downloadCSVFile(data, userIdForFilename);
+                        // Only download if skipDownload is not set (for manual downloads)
+                        // When uploading, skipDownload will be true and we skip this
+                        if (!skipDownload) {
+                            const userIdForFilename = userId || this.app?.userManager?.getUserId() || 'unknown';
+                            this.downloadCSVFile(data, userIdForFilename);
+                        }
                         break;
                         
                     case 'STATS_UPDATE':
