@@ -1,19 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 :root {
-    /* Material Design 3 Color Tokens */
-    --md-sys-color-primary: #6750A4;
+    /* Cloudflare Yellow Theme - Material Design 3 Color Tokens */
+    --md-sys-color-primary: #F6821F;
     --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #EADDFF;
-    --md-sys-color-on-primary-container: #21005D;
-    --md-sys-color-secondary: #625B71;
+    --md-sys-color-primary-container: #FFEAD6;
+    --md-sys-color-on-primary-container: #331100;
+    --md-sys-color-secondary: #F48120;
     --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #E8DEF8;
-    --md-sys-color-on-secondary-container: #1D192B;
-    --md-sys-color-tertiary: #7D5260;
+    --md-sys-color-secondary-container: #FFE8D1;
+    --md-sys-color-on-secondary-container: #2B1500;
+    --md-sys-color-tertiary: #FF6B35;
     --md-sys-color-on-tertiary: #FFFFFF;
-    --md-sys-color-tertiary-container: #FFD8E4;
-    --md-sys-color-on-tertiary-container: #31111D;
+    --md-sys-color-tertiary-container: #FFD8CC;
+    --md-sys-color-on-tertiary-container: #380D00;
     --md-sys-color-error: #BA1A1A;
     --md-sys-color-on-error: #FFFFFF;
     --md-sys-color-error-container: #FFDAD6;

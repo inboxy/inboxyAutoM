@@ -2,17 +2,17 @@
    Material 3 Tabs and Component Styles
    ============================================ */
 
-/* Material 3 Color Tokens */
+/* Material 3 Color Tokens - Cloudflare Yellow Theme */
 :root {
-    --md-sys-color-primary: #6750A4;
+    --md-sys-color-primary: #F6821F;
     --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #EADDFF;
-    --md-sys-color-on-primary-container: #21005D;
-    
-    --md-sys-color-secondary: #625B71;
+    --md-sys-color-primary-container: #FFEAD6;
+    --md-sys-color-on-primary-container: #331100;
+
+    --md-sys-color-secondary: #F48120;
     --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #E8DEF8;
-    --md-sys-color-on-secondary-container: #1D192B;
+    --md-sys-color-secondary-container: #FFE8D1;
+    --md-sys-color-on-secondary-container: #2B1500;
     
     --md-sys-color-surface: #FFFBFE;
     --md-sys-color-on-surface: #1C1B1F;
@@ -43,18 +43,18 @@
     --md-sys-elevation-5: 0px 4px 4px rgba(0, 0, 0, 0.3), 0px 8px 12px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* Dark theme support */
+/* Dark theme support - Cloudflare Yellow Theme */
 @media (prefers-color-scheme: dark) {
     :root {
-        --md-sys-color-primary: #D0BCFF;
-        --md-sys-color-on-primary: #381E72;
-        --md-sys-color-primary-container: #4F378B;
-        --md-sys-color-on-primary-container: #EADDFF;
-        
-        --md-sys-color-secondary: #CCC2DC;
-        --md-sys-color-on-secondary: #332D41;
-        --md-sys-color-secondary-container: #4A4458;
-        --md-sys-color-on-secondary-container: #E8DEF8;
+        --md-sys-color-primary: #FFB570;
+        --md-sys-color-on-primary: #4D2000;
+        --md-sys-color-primary-container: #6C3100;
+        --md-sys-color-on-primary-container: #FFEAD6;
+
+        --md-sys-color-secondary: #FFB870;
+        --md-sys-color-on-secondary: #4A2200;
+        --md-sys-color-secondary-container: #693300;
+        --md-sys-color-on-secondary-container: #FFE8D1;
         
         --md-sys-color-surface: #1C1B1F;
         --md-sys-color-on-surface: #E6E1E5;
