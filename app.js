@@ -393,116 +393,79 @@ class MotionRecorderApp {
     
     async exportAllData() {
         try {
-            this.uiManager.showLoadingState('Exporting all data...');
-            
+            this.uiManager.showLoadingState('Preparing to upload all recordings...');
+
             if (!this.databaseManager || !this.databaseManager.db) {
                 throw new Error('Database not initialized');
             }
-            
+
             // Get all recordings with basic info first
             const recordings = await this.databaseManager.getRecordings();
-            
+
             if (recordings.length === 0) {
-                this.uiManager.showNotification('No data to export. Record some data first.', 'warning');
+                this.uiManager.showNotification('No data to upload. Record some data first.', 'warning');
                 this.uiManager.hideLoadingState();
                 return;
             }
-            
-            // Check total data size to determine export strategy
-            let totalDataPoints = 0;
-            const recordingCounts = [];
-            
-            for (const recording of recordings) {
-                const count = await this.databaseManager.getDataPointsCount(recording.id);
-                recordingCounts.push({ recordingId: recording.id, count });
-                totalDataPoints += count;
-            }
-            
-            const exportData = {
-                metadata: {
-                    exportDate: new Date().toISOString(),
-                    userId: this.userManager.getUserId(),
-                    version: '2.0.0',
-                    totalRecordings: recordings.length,
-                    totalDataPoints: totalDataPoints
-                },
-                recordings: []
-            };
-            
-            // Process recordings with progress updates
+
+            this.uiManager.showNotification(
+                `Starting upload of ${recordings.length} recording(s)...`,
+                'info'
+            );
+
+            let uploadedCount = 0;
+            let failedCount = 0;
+
+            // Upload each recording as a separate CSV file
             for (let i = 0; i < recordings.length; i++) {
                 const recording = recordings[i];
-                const recordingCount = recordingCounts[i].count;
-                
-                this.uiManager.showLoadingState(
-                    `Processing recording ${i + 1}/${recordings.length} (${recordingCount} data points)...`
-                );
-                
-                // For large recordings, use batch processing
-                if (recordingCount > 5000) {
-                    const dataPoints = [];
-                    for await (const batch of this.databaseManager.getDataPointsBatch(recording.id, 2000)) {
-                        dataPoints.push(...batch);
-                        
-                        // Update progress within large recording
-                        const progress = Math.round((dataPoints.length / recordingCount) * 100);
-                        this.uiManager.showLoadingState(
-                            `Processing recording ${i + 1}/${recordings.length}: ${progress}% (${dataPoints.length}/${recordingCount})`
-                        );
-                        
-                        // Give browser time to breathe
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                    }
-                    
-                    exportData.recordings.push({
-                        ...recording,
-                        dataPoints: dataPoints
-                    });
-                } else {
-                    // Smaller recordings can be processed normally
+
+                try {
+                    this.uiManager.showLoadingState(
+                        `Uploading recording ${i + 1}/${recordings.length}...`
+                    );
+
+                    // Get data points for this recording
                     const dataPoints = await this.databaseManager.getDataPoints(recording.id);
-                    exportData.recordings.push({
-                        ...recording,
-                        dataPoints: dataPoints
-                    });
+
+                    if (dataPoints.length === 0) {
+                        console.log(`Skipping recording ${recording.id} - no data points`);
+                        continue;
+                    }
+
+                    // Upload this recording
+                    await this.uploadCSVToServer(dataPoints);
+                    uploadedCount++;
+
+                    // Small delay between uploads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                } catch (error) {
+                    console.error(`Failed to upload recording ${recording.id}:`, error);
+                    failedCount++;
                 }
-                
-                // Give browser time to breathe between recordings
-                await new Promise(resolve => setTimeout(resolve, 5));
             }
-            
-            this.uiManager.showLoadingState('Generating export file...');
-            
-            // Create and download file with userID in filename
-            const jsonContent = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([jsonContent], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const userId = this.userManager.getUserId();
-            const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `motion-recorder-export-${userId}-${timestamp}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            URL.revokeObjectURL(url);
-            
+
             this.uiManager.hideLoadingState();
-            
-            this.uiManager.showNotification(
-                `✅ Exported ${recordings.length} recordings with ${totalDataPoints.toLocaleString()} data points`,
-                'success'
-            );
-            console.log('✅ Export completed with filename:', a.download);
-            
+
+            // Show summary notification
+            if (failedCount === 0) {
+                this.uiManager.showNotification(
+                    `✅ Successfully uploaded ${uploadedCount} recording(s)`,
+                    'success'
+                );
+            } else {
+                this.uiManager.showNotification(
+                    `⚠️ Uploaded ${uploadedCount} recording(s), ${failedCount} failed`,
+                    'warning'
+                );
+            }
+
         } catch (error) {
             this.uiManager.hideLoadingState();
-            console.error('Export failed:', error);
-            ErrorBoundary.handle(error, 'Export All Data');
-            this.uiManager.showNotification('❌ Export failed: ' + error.message, 'error');
+            console.error('Upload all failed:', error);
+            ErrorBoundary.handle(error, 'Upload All Data');
+            this.uiManager.showNotification('❌ Upload failed: ' + error.message, 'error');
         }
     }
     
