@@ -393,16 +393,20 @@ class MotionRecorderApp {
     
     async exportAllData() {
         try {
+            console.log('📤 exportAllData called - starting upload process');
             this.uiManager.showLoadingState('Preparing to upload all recordings...');
 
             if (!this.databaseManager || !this.databaseManager.db) {
+                console.error('❌ Database not initialized');
                 throw new Error('Database not initialized');
             }
 
             // Get all recordings with basic info first
             const recordings = await this.databaseManager.getRecordings();
+            console.log(`📊 Found ${recordings.length} recordings in database:`, recordings);
 
             if (recordings.length === 0) {
+                console.log('⚠️ No recordings found');
                 this.uiManager.showNotification('No data to upload. Record some data first.', 'warning');
                 this.uiManager.hideLoadingState();
                 return;
@@ -419,6 +423,7 @@ class MotionRecorderApp {
             // Upload each recording as a separate CSV file
             for (let i = 0; i < recordings.length; i++) {
                 const recording = recordings[i];
+                console.log(`\n🔄 Processing recording ${i + 1}/${recordings.length}:`, recording);
 
                 try {
                     this.uiManager.showLoadingState(
@@ -427,24 +432,29 @@ class MotionRecorderApp {
 
                     // Get data points for this recording
                     const dataPoints = await this.databaseManager.getDataPoints(recording.id);
+                    console.log(`📊 Recording ${recording.id} has ${dataPoints.length} data points`);
 
                     if (dataPoints.length === 0) {
-                        console.log(`Skipping recording ${recording.id} - no data points`);
+                        console.log(`⏭️ Skipping recording ${recording.id} - no data points`);
                         continue;
                     }
 
                     // Upload this recording
+                    console.log(`📤 Uploading recording ${recording.id}...`);
                     await this.uploadCSVToServer(dataPoints);
                     uploadedCount++;
+                    console.log(`✅ Recording ${recording.id} uploaded successfully`);
 
                     // Small delay between uploads
                     await new Promise(resolve => setTimeout(resolve, 500));
 
                 } catch (error) {
-                    console.error(`Failed to upload recording ${recording.id}:`, error);
+                    console.error(`❌ Failed to upload recording ${recording.id}:`, error);
                     failedCount++;
                 }
             }
+
+            console.log(`\n📊 Upload summary: ${uploadedCount} succeeded, ${failedCount} failed`);
 
             this.uiManager.hideLoadingState();
 

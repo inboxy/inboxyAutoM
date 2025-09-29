@@ -115,9 +115,13 @@ export class UIManager {
         }
         
         if (exportBtn) {
+            console.log('✅ Export/Upload All Data button found, attaching event listener');
             exportBtn.addEventListener('click', () => {
+                console.log('🖱️ Upload All Data button clicked!');
                 this.app.exportAllData();
             });
+        } else {
+            console.error('❌ Export/Upload All Data button not found!');
         }
         
         // Permission retry buttons
