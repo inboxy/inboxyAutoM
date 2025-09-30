@@ -1048,7 +1048,7 @@ body {
     position: fixed !important;
     bottom: 24px !important;
     right: 24px !important;
-    z-index: 9999 !important;
+    z-index: 10000 !important;
     width: 80px !important;
     height: 80px !important;
     pointer-events: all !important;
